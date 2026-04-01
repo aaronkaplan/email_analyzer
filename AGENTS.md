@@ -64,6 +64,11 @@ Use these by default when needed:
 5. If a dependency (pip package) is needed, ask first before installing it.
 6. Remember and pin versions and their hashes
 
+### Security and coding best practices scans
+1. Use the tools in .github/workflows also locally to check (before git pushing) if they complain.
+2. If one of the tools complains, try to fix it.
+3. Running pytest is not sufficient for good code. 
+
 ### Approved External Tools
 
 1. `ripMIME` as an optional installed fallback for malformed MIME extraction or salvage
@@ -73,7 +78,6 @@ Use these by default when needed:
 Keep the baseline dependency set permissive-license friendly.
 
 You may  add GPL or AGPL dependencies even without explicit user approval.
-
 
 `ripMIME` is allowed because it is treated as an external tool fallback, not a baseline Python package dependency.
 
@@ -362,3 +366,5 @@ When in doubt, keep these decisions fixed:
 9. file-level parallelism
 10. JSONL logging
 11. processed JSON first, OpenAI batch rendering second
+12. Every testing loop must also check the result of the .github/workflow scripts (ruff, linting, etc.). 
+13. Check pip package dependencies carefully. Don't just pull in anything without carefully checking if you would open yourself to a software supply chain attack.
