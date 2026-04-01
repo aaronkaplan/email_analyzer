@@ -4,9 +4,21 @@
 
 ## Requirements
 
-1. `OPENAI_API_KEY` must be set.
+1. `OPENAI_API_KEY` must be available, either from your shell environment or a local `.env` file.
 2. The batch shard must already target `/v1/responses`.
 3. The batch shard must contain one model only.
+
+The CLI auto-loads `.env` before running commands.
+
+Recommended setup:
+
+```bash
+cp .env.example .env
+```
+
+Fill in `OPENAI_API_KEY` and any other local `OPENAI_*` values you want to keep around.
+
+If a variable is already exported in your shell, that exported value wins over `.env`.
 
 ## Basic Usage
 

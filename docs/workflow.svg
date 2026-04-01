@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="420" viewBox="0 0 1400 420" role="img" aria-labelledby="title desc">
+  <title id="title">Email Analyzer workflow</title>
+  <desc id="desc">Raw emails move through prepare, render-batch, submit-batch, and batch-output-to-xlsx to produce JSON, batch JSONL, batch results, and XLSX output.</desc>
+  <rect x="0" y="0" width="1400" height="420" rx="24" fill="#ffffff"/>
+
+  <text x="56" y="54" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f172a">Email Analyzer Workflow</text>
+  <text x="56" y="84" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#475569">Raw emails become reduced JSON, batch JSONL, OpenAI results, and optional XLSX output.</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect x="56" y="132" width="180" height="92" rx="16" fill="#dbeafe" stroke="#60a5fa" stroke-width="2"/>
+  <text x="78" y="170" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f172a">input/</text>
+  <text x="78" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">raw RFC822 emails</text>
+
+  <rect x="282" y="132" width="160" height="92" rx="16" fill="#dcfce7" stroke="#4ade80" stroke-width="2"/>
+  <text x="317" y="170" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f172a">prepare</text>
+  <text x="306" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">parse + reduce MIME</text>
+
+  <rect x="488" y="132" width="190" height="92" rx="16" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
+  <text x="525" y="170" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0f172a">output/*.json</text>
+  <text x="514" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">one reduced artifact per email</text>
+
+  <rect x="724" y="132" width="190" height="92" rx="16" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="756" y="170" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0f172a">render-batch</text>
+  <text x="748" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">render /v1/responses JSONL</text>
+
+  <rect x="960" y="132" width="220" height="92" rx="16" fill="#e9d5ff" stroke="#a855f7" stroke-width="2"/>
+  <text x="991" y="170" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0f172a">output/batches/*.jsonl</text>
+  <text x="1025" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">OpenAI batch shard</text>
+
+  <path d="M236 178 H282" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M442 178 H488" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M678 178 H724" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M914 178 H960" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+
+  <rect x="252" y="286" width="896" height="88" rx="18" fill="#fff7ed" stroke="#fb923c" stroke-width="2"/>
+  <text x="282" y="320" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Optional OpenAI and export steps</text>
+  <text x="282" y="348" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">Use Structured Outputs with a schema file, then submit the shard and export the successful results to Excel.</text>
+
+  <rect x="298" y="242" width="180" height="92" rx="16" fill="#fee2e2" stroke="#f87171" stroke-width="2"/>
+  <text x="323" y="280" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0f172a">submit-batch</text>
+  <text x="335" y="308" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">autoloads .env</text>
+
+  <rect x="544" y="242" width="250" height="92" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+  <text x="571" y="280" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">batch_output/batch-00001/</text>
+  <text x="579" y="308" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">batch_output.jsonl + summary files</text>
+
+  <rect x="860" y="242" width="232" height="92" rx="16" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="882" y="280" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">batch-output-to-xlsx</text>
+  <text x="902" y="308" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">custom_id + schema fields</text>
+
+  <rect x="1158" y="242" width="160" height="92" rx="16" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="1214" y="280" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f172a">.xlsx</text>
+  <text x="1178" y="308" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">spreadsheet export</text>
+
+  <path d="M1180 224 C1180 248 1170 256 1120 256" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M478 288 H544" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M794 288 H860" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path d="M1092 288 H1158" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+
+  <rect x="56" y="286" width="158" height="88" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+  <text x="77" y="320" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#0f172a">Stable identity</text>
+  <text x="77" y="348" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#334155">filename = email_id =</text>
+  <text x="77" y="366" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#334155">custom_id</text>
+</svg>
