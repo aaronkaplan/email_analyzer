@@ -1,0 +1,69 @@
+From: Alice <alice@example.com>
+To: Bob <bob@example.com>
+Subject: Test alternative body
+Date: Wed, 1 Apr 2026 10:00:00 +0000
+Message-ID: <alt-dup@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix-123"
+
+--mix-123
+Content-Type: multipart/alternative; boundary="alt-123"
+
+--alt-123
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+Hello Bob,
+
+Here is the update you asked for.
+
+Regards,
+Alice
+
+On Tue, Mar 31, 2026 at 5:30 PM Bob <bob@example.com> wrote:
+> Can you send the update?
+
+--alt-123
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+  <body>
+    <p>Hello Bob,</p>
+    <p>Here is the update you asked for.</p>
+    <p>Regards,<br/>Alice</p>
+    <blockquote>
+      On Tue, Mar 31, 2026 at 5:30 PM Bob &lt;bob@example.com&gt; wrote:<br/>
+      Can you send the update?
+    </blockquote>
+  </body>
+</html>
+
+--alt-123--
+
+--mix-123
+Content-Type: text/html; charset="utf-8"
+Content-Disposition: attachment; filename="body.html"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+  <body>
+    <p>Hello Bob,</p>
+    <p>Here is the update you asked for.</p>
+    <p>Regards,<br/>Alice</p>
+    <blockquote>
+      On Tue, Mar 31, 2026 at 5:30 PM Bob &lt;bob@example.com&gt; wrote:<br/>
+      Can you send the update?
+    </blockquote>
+  </body>
+</html>
+
+--mix-123
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: attachment; filename="notes.txt"
+
+Project notes:
+- budget approved
+- vendor selected
+
+--mix-123--

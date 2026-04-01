@@ -363,6 +363,69 @@ uv run python -m email_analyzer render-batch --processed output --batch-dir outp
 
 The CLI names are part of the planned public interface and should stay stable unless there is a strong reason to change them.
 
+## Parallel Runs
+
+`prepare` supports parallel execution by email file.
+
+Use the `--workers` flag to control the worker count:
+
+```bash
+uv run python -m email_analyzer prepare --input input --output output --logs logs --workers 1
+uv run python -m email_analyzer prepare --input input --output output --logs logs --workers 8
+```
+
+Behavior:
+
+1. one worker processes one email end-to-end
+2. outputs are still one JSON file per input email
+3. logs remain centralized in `logs/`
+4. per-step and per-file timings are recorded for later benchmarking
+
+For benchmarking, compare runs with different `--workers` values while keeping the same corpus and machine.
+
+## Benchmark Notes
+
+The repository has been smoke-benchmarked against the Apache SpamAssassin public corpus.
+
+Corpus used:
+
+1. `20030228_easy_ham`
+2. `20030228_easy_ham_2`
+3. `20030228_hard_ham`
+4. `20030228_spam`
+5. `20030228_spam_2`
+
+Flattened benchmark set:
+
+1. `6052` raw email files
+2. `32998533` input bytes, about `31.47 MiB`
+3. zero processing failures in the current implementation
+
+Measured `prepare` throughput on this machine:
+
+| Workers | Files | Errors | Wall Time | Emails/sec | MiB/sec |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `1` | `6052` | `0` | `199.33s` | `30.361` | `0.158` |
+| `8` | `6052` | `0` | `45.50s` | `133.002` | `0.692` |
+
+Observed speedup from `1` to `8` workers: about `4.38x`.
+
+The hottest steps in this first pass are:
+
+1. `detect_language`
+2. `strip_quotes_and_signatures`
+3. `write_output`
+
+Example benchmark commands:
+
+```bash
+uv run python -m email_analyzer prepare --input "benchmarks/spamassassin/input" --output "benchmarks/spamassassin/runs/output_w1" --logs "benchmarks/spamassassin/runs/logs_w1" --workers 1
+uv run python -m email_analyzer prepare --input "benchmarks/spamassassin/input" --output "benchmarks/spamassassin/runs/output_w8" --logs "benchmarks/spamassassin/runs/logs_w8" --workers 8
+uv run python -m email_analyzer render-batch --processed "benchmarks/spamassassin/runs/output_w8" --batch-dir "benchmarks/spamassassin/runs/output_w8/batches" --model gpt-4o-mini
+```
+
+On the same corpus, `render-batch` produced one `6052`-line JSONL shard of about `33.03 MiB` in about `2.89s`.
+
 ## Development Principles
 
 1. keep the dependency set small

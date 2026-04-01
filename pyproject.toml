@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "email-analyzer"
+version = "0.1.0"
+description = "Local email preprocessing pipeline for LLM analysis"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "charset-normalizer>=3.4.6",
+  "lingua-language-detector>=2.2.0",
+  "mail-parser-reply>=1.36",
+  "rapidfuzz>=3.14.3",
+  "selectolax>=0.4.7",
+]
+
+[project.scripts]
+email-analyzer = "email_analyzer.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.5",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
