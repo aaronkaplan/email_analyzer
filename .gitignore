@@ -17,4 +17,4 @@ output/
 *.log
 
 logs/
-benchmarks/spamassassin/*
+benchmarks/*
