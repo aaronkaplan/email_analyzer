@@ -11,18 +11,18 @@ The goal is to send far fewer, higher-value text snippets to an LLM than the raw
 
 ## Status
 
-The repository currently documents the design and target stack.
+The repository currently implements the first-pass local pipeline and OpenAI batch submission flow.
 
-Planned implementation scope for the first pass:
+Current implementation scope:
 
 1. `prepare`: parse, reduce, and write `output/<filename>.json`
 2. `render-batch`: render OpenAI Batch API JSONL files from those processed outputs
+3. `submit-batch`: upload one rendered shard, poll to completion, and download output and error files
+4. `batch-output-to-xlsx`: convert successful batch result JSONL into a spreadsheet
 
 Not in the first pass:
 
-1. OpenAI batch submission
-2. batch polling and result collection
-3. OCR or deep document extraction for complex binary attachments
+1. OCR or deep document extraction for complex binary attachments
 
 ## Input Assumptions
 
@@ -127,7 +127,62 @@ Target output:
 1. `output/batches/batch-00001.jsonl`
 2. additional shards as needed
 
+If you want Structured Outputs for `/v1/responses`, render with `--schema-file path/to/schema.py` where the file defines `class mySchema(BaseModel):`.
+
 This split is deliberate: prompt tuning should not require reparsing the raw emails.
+
+### Stage 3: `submit-batch`
+
+This stage uploads one rendered shard to OpenAI Batch API, polls it to a terminal state, downloads output and error reports, and writes submission metrics under `batch_output/`.
+
+Example:
+
+```bash
+uv run python -m email_analyzer submit-batch --batch-jsonl output/batches/batch-00001.jsonl
+uv run python -m email_analyzer submit-batch --batch-jsonl output/batches/batch-00001.jsonl --prompt-from-file prompts/classify_email.md
+uv run python -m email_analyzer submit-batch --resume-batch-id batch_abc123
+uv run python -m email_analyzer submit-batch --batch-jsonl output/batches/batch-00001.jsonl --no-wait
+```
+
+If a prompt override is supplied, `submit-batch` rewrites the shard in place by updating `body.instructions` before upload.
+
+See:
+
+1. `docs/batch_submission.md`
+2. `docs/batch_state_machine.md`
+
+### Stage 4: `batch-output-to-xlsx`
+
+This stage reads a successful downloaded `batch_output.jsonl` file and writes one `.xlsx` row per email.
+
+The output includes:
+
+1. `filename` from OpenAI `custom_id`
+2. one column per field in the structured output object
+
+If you pass `--schema-file`, the spreadsheet column order follows `mySchema`, including any field aliases such as `from`.
+
+Example:
+
+```bash
+uv run python -m email_analyzer batch-output-to-xlsx \
+  --input-jsonl benchmarks/spamassassin/runs/output_w8_structured/batch_output/batch-00001/batch_output.jsonl \
+  --output-xlsx benchmarks/spamassassin/runs/output_w8_structured/batch_output/batch-00001/batch_output.xlsx \
+  --schema-file docs/structured_output_schema_example.py
+```
+
+### Mailbox Flattening For Benchmarks
+
+Some public corpora are distributed as `mbox` or `mbox`-style monthly archives rather than one message per file.
+
+Use `flatten-mailbox` to turn those archives into the repository's normal flat `input/` layout:
+
+```bash
+uv run python -m email_analyzer flatten-mailbox --source "benchmarks/python_list_2026_03/downloads/python-list-2026-03.mbox.gz" --output "benchmarks/python_list_2026_03/input" --filename-prefix "python-list-2026-03"
+uv run python -m email_analyzer flatten-mailbox --source "benchmarks/ubuntu_devel_2026_03/downloads/ubuntu-devel-2026-03.txt.gz" --output "benchmarks/ubuntu_devel_2026_03/input" --filename-prefix "ubuntu-devel-2026-03"
+```
+
+The command supports plain mailbox files and `.gz`-compressed mailbox archives.
 
 ## Detailed Pipeline
 
@@ -340,7 +395,18 @@ Example JSONL line:
   "url": "/v1/responses",
   "body": {
     "model": "gpt-4o-mini",
-    "input": "...prompt and reduced email content..."
+    "instructions": "...task instructions...",
+    "input": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "...reduced email JSON payload..."
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -407,14 +473,19 @@ Measured `prepare` throughput on this machine:
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `1` | `6052` | `0` | `199.33s` | `30.361` | `0.158` |
 | `8` | `6052` | `0` | `45.50s` | `133.002` | `0.692` |
+| `8` after language-detection optimization | `6052` | `0` | `40.01s` | `151.260` | `0.787` |
 
 Observed speedup from `1` to `8` workers: about `4.38x`.
+
+Observed speedup from the first `8`-worker run to the optimized `8`-worker run: about `1.14x`.
 
 The hottest steps in this first pass are:
 
 1. `detect_language`
 2. `strip_quotes_and_signatures`
 3. `write_output`
+
+The first optimization pass changed language detection from full confidence-table calculation to single-language confidence lookup. That improved end-to-end throughput, but `detect_language` remains the dominant hot path.
 
 Example benchmark commands:
 
@@ -425,6 +496,20 @@ uv run python -m email_analyzer render-batch --processed "benchmarks/spamassassi
 ```
 
 On the same corpus, `render-batch` produced one `6052`-line JSONL shard of about `33.03 MiB` in about `2.89s`.
+
+Additional `prepare` benchmarks on newer public mailing-list corpora:
+
+| Corpus | Workers | Files | Errors | Input Size | Wall Time | Emails/sec | MiB/sec |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `python-list` March 2026 | `8` | `65` | `0` | `108322` bytes | `2.47s` | `26.316` | `0.042` |
+| `ubuntu-devel` March 2026 | `8` | `45` | `0` | `323745` bytes | `2.67s` | `16.854` | `0.116` |
+| `binutils` March 2026 | `8` | `396` | `0` | `1940052` bytes | `4.60s` | `86.087` | `0.402` |
+
+These newer corpora show different bottlenecks by content profile:
+
+1. `ubuntu-devel` is slower per byte because longer human discussion threads spend more time in quote stripping and language detection.
+2. `binutils` is much faster than `ubuntu-devel` on a per-byte basis because many messages are shorter, more repetitive build notifications.
+3. `python-list` mixes plain discussion mail and attached-message style content, and lands between the two in absolute throughput.
 
 ## Development Principles
 

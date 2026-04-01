@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ def run_render_batch(config: RenderBatchConfig) -> int:
     )
 
     instructions = _read_instructions(config.instructions_file)
+    response_format = _load_schema_format(config.schema_file)
     shards: list[list[str]] = []
     current_shard: list[str] = []
     current_requests = 0
@@ -25,8 +27,10 @@ def run_render_batch(config: RenderBatchConfig) -> int:
 
     for processed_path in processed_files:
         processed = json.loads(processed_path.read_text(encoding="utf-8"))
-        line = _render_line(processed, config.model, instructions)
-        encoded_line = json.dumps(line, ensure_ascii=False, sort_keys=True)
+        line = _render_line(processed, config.model, instructions, response_format=response_format)
+        # Keep JSONL records ASCII-escaped so Unicode line-separator code points
+        # inside email text cannot be misread as record boundaries.
+        encoded_line = json.dumps(line, ensure_ascii=True, sort_keys=True)
         encoded_bytes = len((encoded_line + "\n").encode("utf-8"))
 
         if current_shard and (
@@ -55,7 +59,65 @@ def _read_instructions(instructions_file: Path | None) -> str:
     return instructions_file.read_text(encoding="utf-8").strip()
 
 
-def _render_line(processed: dict[str, Any], model: str, instructions: str) -> dict[str, Any]:
+def _load_schema_format(schema_file: Path | None) -> dict[str, Any] | None:
+    if schema_file is None:
+        return None
+    if not schema_file.exists():
+        raise FileNotFoundError(f"Schema file does not exist: {schema_file}")
+
+    module_name = f"email_analyzer_schema_{schema_file.stem.replace('-', '_')}"
+    spec = importlib.util.spec_from_file_location(module_name, schema_file)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load schema module from {schema_file}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    schema_class = getattr(module, "mySchema", None)
+    if schema_class is None:
+        raise ValueError(f"Schema file must define class mySchema(BaseModel): {schema_file}")
+
+    model_json_schema = getattr(schema_class, "model_json_schema", None)
+    if not callable(model_json_schema):
+        raise ValueError(f"mySchema must provide model_json_schema(): {schema_file}")
+
+    schema_name = getattr(schema_class, "__name__", "mySchema")
+    schema = model_json_schema()
+    _ensure_strict_json_schema(schema)
+
+    return {
+        "format": {
+            "type": "json_schema",
+            "name": schema_name,
+            "schema": schema,
+            "strict": True,
+        }
+    }
+
+
+def _ensure_strict_json_schema(node: Any) -> None:
+    if isinstance(node, dict):
+        if node.get("type") == "object" or "properties" in node:
+            node.setdefault("additionalProperties", False)
+            properties = node.get("properties")
+            if isinstance(properties, dict):
+                node["required"] = list(properties)
+        for value in node.values():
+            _ensure_strict_json_schema(value)
+        return
+
+    if isinstance(node, list):
+        for item in node:
+            _ensure_strict_json_schema(item)
+
+
+def _render_line(
+    processed: dict[str, Any],
+    model: str,
+    instructions: str,
+    *,
+    response_format: dict[str, Any] | None,
+) -> dict[str, Any]:
     email_package = {
         "email_id": processed["email_id"],
         "source_filename": processed["source_filename"],
@@ -71,15 +133,30 @@ def _render_line(processed: dict[str, Any], model: str, instructions: str) -> di
         },
     }
 
+    body = {
+        "model": model,
+        "instructions": instructions,
+        "input": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": json.dumps(email_package, ensure_ascii=False, sort_keys=True),
+                    }
+                ],
+            }
+        ],
+    }
+
+    if response_format is not None:
+        body["text"] = response_format
+
     return {
         "custom_id": processed["source_filename"],
         "method": "POST",
         "url": OPENAI_BATCH_ENDPOINT,
-        "body": {
-            "model": model,
-            "instructions": instructions,
-            "input": json.dumps(email_package, ensure_ascii=False, sort_keys=True),
-        },
+        "body": body,
     }
 
 

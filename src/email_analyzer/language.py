@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from lingua import LanguageDetectorBuilder
+try:
+    from lingua import LanguageDetectorBuilder
+except ImportError:  # pragma: no cover - package namespace collision fallback
+    from lingua.lingua import LanguageDetectorBuilder
 
 _DETECTOR = None
 
@@ -21,9 +24,7 @@ def detect_language(text: str) -> dict[str, Any] | None:
     confidence = None
 
     try:
-        confidence_values = detector.compute_language_confidence_values(cleaned)
-        if confidence_values:
-            confidence = round(float(getattr(confidence_values[0], "value", 0.0)), 6)
+        confidence = round(float(detector.compute_language_confidence(cleaned, language)), 6)
     except Exception:
         confidence = None
 

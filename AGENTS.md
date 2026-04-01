@@ -10,9 +10,9 @@ Build and maintain a local email preprocessing pipeline that:
 2. reduces noisy MIME content into one LLM-ready JSON artifact per email
 3. renders OpenAI Batch API JSONL request files from those processed artifacts
 
-Current implementation scope stops at `prepare` and `render-batch`.
+Current implementation scope includes `prepare`, `render-batch`, and `submit-batch`.
 
-Do not implement OpenAI submission or collection unless the user explicitly asks for it.
+OpenAI submission and result collection may be implemented when the user explicitly asks for it.
 
 ## Fixed Assumptions
 
@@ -110,13 +110,14 @@ uv sync
 uv run pytest
 uv run python -m email_analyzer prepare --input input --output output --logs logs --workers 8
 uv run python -m email_analyzer render-batch --processed output --batch-dir output/batches --model gpt-4o-mini
+uv run python -m email_analyzer submit-batch --batch-jsonl output/batches/batch-00001.jsonl
 ```
 
 Do not introduce `requirements.txt` if `pyproject.toml` can express the same thing.
 
 ## CLI Contract
 
-The intended public CLI has two subcommands.
+The intended public CLI has these subcommands.
 
 ### `prepare`
 
@@ -125,6 +126,10 @@ Reads raw email files from `input/` and writes one processed JSON artifact per f
 ### `render-batch`
 
 Reads processed JSON artifacts and writes OpenAI Batch API JSONL shard files.
+
+### `submit-batch`
+
+Uploads one rendered shard to OpenAI Batch API, monitors it, and downloads output and error files.
 
 Treat these names as stable unless the user explicitly asks to rename them.
 

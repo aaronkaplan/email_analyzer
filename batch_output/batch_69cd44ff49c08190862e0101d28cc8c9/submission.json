@@ -1,0 +1,10 @@
+{
+  "batch_id": "batch_69cd44ff49c08190862e0101d28cc8c9",
+  "endpoint": "/v1/responses",
+  "output_dir": "batch_output/batch_69cd44ff49c08190862e0101d28cc8c9",
+  "resume_batch_id": "batch_69cd44ff49c08190862e0101d28cc8c9",
+  "resume_mode": true,
+  "resumed_at": "2026-04-01T17:39:33.892729+00:00",
+  "source_batch_jsonl": null,
+  "started_at": "2026-04-01T17:39:33.002494+00:00"
+}
