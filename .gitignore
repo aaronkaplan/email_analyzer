@@ -8,8 +8,7 @@ input/
 logs/
 output/
 benchmarks/*
-batch_output/*
-
+batch_output/
 .env/
 *.pyc
 *.pyo
