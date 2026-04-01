@@ -1,0 +1,26 @@
+[MASTER]
+ignore-paths=^tests/.*$
+jobs=1
+persistent=no
+
+[MESSAGES CONTROL]
+disable=
+    consider-using-f-string,
+    duplicate-code,
+    import-outside-toplevel,
+    too-many-lines,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    too-many-positional-arguments,
+    too-many-instance-attributes,
+    too-many-return-statements,
+    broad-exception-caught
+
+[FORMAT]
+max-line-length=260
+
+[BASIC]
+good-names=i,j,k,_,id,f1,tp,tn,fp,fn,url,db

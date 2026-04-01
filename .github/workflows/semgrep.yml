@@ -39,4 +39,4 @@ jobs:
         run: python -m pip install --upgrade pip semgrep
 
       - name: Run Semgrep
-        run: semgrep --config p/default --metrics off --disable-version-check --exclude .venv  .vscode .github venv benchmarks docs  tests
+        run: semgrep --config p/default --metrics off --disable-version-check --exclude .venv .github benchmarks docs tests

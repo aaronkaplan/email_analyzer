@@ -37,4 +37,4 @@ jobs:
         run: python -m pip install --upgrade pip ruff
 
       - name: Run Ruff
-        run: python -m ruff check . --exclude .venv 
+        run: python -m ruff check . --exclude .venv .pytest_cache .github  benchmarks docs   
