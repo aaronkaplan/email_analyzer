@@ -56,6 +56,14 @@ Use these by default when needed:
 4. `mail-parser-reply` for reply-chain stripping on normalized plain text
 5. `lingua-language-detector` for language detection
 
+### Software Supply Chain checks
+1. every dependency might pull in other dependencies. This is a DAG.
+2. Check those if there are known vulnerabilities
+3. If possible, use github for these checks
+4. Reduce the number of dependencies to a minimum
+5. If a dependency (pip package) is needed, ask first before installing it.
+6. Remember and pin versions and their hashes
+
 ### Approved External Tools
 
 1. `ripMIME` as an optional installed fallback for malformed MIME extraction or salvage
