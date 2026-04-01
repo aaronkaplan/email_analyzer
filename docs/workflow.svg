@@ -1,69 +1,151 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="420" viewBox="0 0 1400 420" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560" role="img" aria-labelledby="title desc">
   <title id="title">Email Analyzer workflow</title>
   <desc id="desc">Raw emails move through prepare, render-batch, submit-batch, and batch-output-to-xlsx to produce JSON, batch JSONL, batch results, and XLSX output.</desc>
-  <rect x="0" y="0" width="1400" height="420" rx="24" fill="#ffffff"/>
-
-  <text x="56" y="54" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f172a">Email Analyzer Workflow</text>
-  <text x="56" y="84" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#475569">Raw emails become reduced JSON, batch JSONL, OpenAI results, and optional XLSX output.</text>
 
   <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L0,6 L9,3 z" fill="#64748b"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
     </marker>
+    <style>
+      .title {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 30px;
+        font-weight: 700;
+        fill: #0f172a;
+      }
+      .subtitle {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        fill: #475569;
+      }
+      .section-label {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        fill: #0f172a;
+      }
+      .process-box {
+        fill: #dbeafe;
+        stroke: #2563eb;
+        stroke-width: 2;
+      }
+      .data-box {
+        fill: #f8fafc;
+        stroke: #64748b;
+        stroke-width: 2;
+      }
+      .box-title {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 21px;
+        font-weight: 700;
+        fill: #0f172a;
+        text-anchor: middle;
+      }
+      .box-title-tight {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        fill: #0f172a;
+        text-anchor: middle;
+      }
+      .box-body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 14px;
+        fill: #334155;
+        text-anchor: middle;
+      }
+      .note-title {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        fill: #0f172a;
+      }
+      .note-body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 14px;
+        fill: #334155;
+      }
+      .legend-label {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 13px;
+        fill: #334155;
+      }
+      .arrow {
+        stroke: #64748b;
+        stroke-width: 3;
+        fill: none;
+        marker-end: url(#arrow);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+    </style>
   </defs>
 
-  <rect x="56" y="132" width="180" height="92" rx="16" fill="#dbeafe" stroke="#60a5fa" stroke-width="2"/>
-  <text x="78" y="170" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f172a">input/</text>
-  <text x="78" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">raw RFC822 emails</text>
+  <rect x="0.5" y="0.5" width="1399" height="559" rx="24" fill="#ffffff" stroke="#e2e8f0"/>
 
-  <rect x="282" y="132" width="160" height="92" rx="16" fill="#dcfce7" stroke="#4ade80" stroke-width="2"/>
-  <text x="317" y="170" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f172a">prepare</text>
-  <text x="306" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">parse + reduce MIME</text>
+  <text x="56" y="56" class="title">Email Analyzer Workflow</text>
+  <text x="56" y="84" class="subtitle">Raw emails become reduced JSON, batch JSONL, OpenAI results, and optional XLSX output.</text>
 
-  <rect x="488" y="132" width="190" height="92" rx="16" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
-  <text x="525" y="170" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0f172a">output/*.json</text>
-  <text x="514" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">one reduced artifact per email</text>
+  <rect x="998" y="20" width="346" height="86" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="1022" y="46" class="note-title">Stable identity</text>
+  <text x="1022" y="67" class="note-body">filename = email_id = custom_id</text>
+  <rect x="1022" y="79" width="18" height="12" rx="4" class="process-box"/>
+  <text x="1049" y="89" class="legend-label">process step</text>
+  <rect x="1146" y="79" width="18" height="12" rx="4" class="data-box"/>
+  <text x="1173" y="89" class="legend-label">data artifact</text>
 
-  <rect x="724" y="132" width="190" height="92" rx="16" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
-  <text x="756" y="170" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0f172a">render-batch</text>
-  <text x="748" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">render /v1/responses JSONL</text>
+  <rect x="40" y="120" width="1320" height="160" rx="22" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="68" y="152" class="section-label">Core pipeline</text>
 
-  <rect x="960" y="132" width="220" height="92" rx="16" fill="#e9d5ff" stroke="#a855f7" stroke-width="2"/>
-  <text x="991" y="170" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0f172a">output/batches/*.jsonl</text>
-  <text x="1025" y="198" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">OpenAI batch shard</text>
+  <rect x="70" y="170" width="190" height="96" rx="14" class="data-box"/>
+  <text x="165" y="207" class="box-title">input/</text>
+  <text x="165" y="233" class="box-body">raw RFC822 emails</text>
 
-  <path d="M236 178 H282" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
-  <path d="M442 178 H488" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
-  <path d="M678 178 H724" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
-  <path d="M914 178 H960" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <rect x="310" y="170" width="170" height="96" rx="18" class="process-box"/>
+  <text x="395" y="207" class="box-title">prepare</text>
+  <text x="395" y="233" class="box-body">parse + reduce MIME</text>
 
-  <rect x="252" y="286" width="896" height="88" rx="18" fill="#fff7ed" stroke="#fb923c" stroke-width="2"/>
-  <text x="282" y="320" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Optional OpenAI and export steps</text>
-  <text x="282" y="348" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">Use Structured Outputs with a schema file, then submit the shard and export the successful results to Excel.</text>
+  <rect x="530" y="170" width="220" height="96" rx="14" class="data-box"/>
+  <text x="640" y="205" class="box-title">output/*.json</text>
+  <text x="640" y="229" class="box-body">one reduced artifact</text>
+  <text x="640" y="247" class="box-body">per email</text>
 
-  <rect x="298" y="242" width="180" height="92" rx="16" fill="#fee2e2" stroke="#f87171" stroke-width="2"/>
-  <text x="323" y="280" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0f172a">submit-batch</text>
-  <text x="335" y="308" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">autoloads .env</text>
+  <rect x="800" y="170" width="190" height="96" rx="18" class="process-box"/>
+  <text x="895" y="205" class="box-title-tight">render-batch</text>
+  <text x="895" y="229" class="box-body">render /v1/responses</text>
+  <text x="895" y="247" class="box-body">JSONL requests</text>
 
-  <rect x="544" y="242" width="250" height="92" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
-  <text x="571" y="280" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">batch_output/batch-00001/</text>
-  <text x="579" y="308" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">batch_output.jsonl + summary files</text>
+  <rect x="1040" y="170" width="260" height="96" rx="14" class="data-box"/>
+  <text x="1170" y="205" class="box-title-tight">output/batches/*.jsonl</text>
+  <text x="1170" y="233" class="box-body">OpenAI batch shard</text>
 
-  <rect x="860" y="242" width="232" height="92" rx="16" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2"/>
-  <text x="882" y="280" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">batch-output-to-xlsx</text>
-  <text x="902" y="308" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">custom_id + schema fields</text>
+  <path d="M 260 218 H 310" class="arrow"/>
+  <path d="M 480 218 H 530" class="arrow"/>
+  <path d="M 750 218 H 800" class="arrow"/>
+  <path d="M 990 218 H 1040" class="arrow"/>
 
-  <rect x="1158" y="242" width="160" height="92" rx="16" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2"/>
-  <text x="1214" y="280" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#0f172a">.xlsx</text>
-  <text x="1178" y="308" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#334155">spreadsheet export</text>
+  <rect x="40" y="300" width="1320" height="200" rx="22" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+  <text x="68" y="332" class="section-label">Optional OpenAI submission + export</text>
+  <text x="68" y="356" class="subtitle">Use Structured Outputs with a schema file, then submit the shard and export successful results to Excel.</text>
 
-  <path d="M1180 224 C1180 248 1170 256 1120 256" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
-  <path d="M478 288 H544" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
-  <path d="M794 288 H860" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
-  <path d="M1092 288 H1158" stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <rect x="80" y="392" width="200" height="92" rx="18" class="process-box"/>
+  <text x="180" y="428" class="box-title-tight">submit-batch</text>
+  <text x="180" y="454" class="box-body">autoloads .env</text>
 
-  <rect x="56" y="286" width="158" height="88" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
-  <text x="77" y="320" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#0f172a">Stable identity</text>
-  <text x="77" y="348" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#334155">filename = email_id =</text>
-  <text x="77" y="366" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#334155">custom_id</text>
+  <rect x="350" y="392" width="320" height="92" rx="14" class="data-box"/>
+  <text x="510" y="426" class="box-title-tight">batch_output/batch-00001/</text>
+  <text x="510" y="450" class="box-body">batch_output.jsonl + summary files</text>
+
+  <rect x="740" y="392" width="260" height="92" rx="18" class="process-box"/>
+  <text x="870" y="426" class="box-title-tight">batch-output-to-xlsx</text>
+  <text x="870" y="450" class="box-body">custom_id + schema fields</text>
+
+  <rect x="1070" y="392" width="180" height="92" rx="14" class="data-box"/>
+  <text x="1160" y="428" class="box-title">.xlsx</text>
+  <text x="1160" y="454" class="box-body">spreadsheet export</text>
+
+  <path d="M 1170 266 V 374 H 180 V 392" class="arrow"/>
+  <path d="M 280 438 H 350" class="arrow"/>
+  <path d="M 670 438 H 740" class="arrow"/>
+  <path d="M 1000 438 H 1070" class="arrow"/>
 </svg>
