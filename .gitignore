@@ -7,6 +7,7 @@ dist/
 input/
 logs/
 output/
+benchmarks/*
 
 .env/
 *.pyc
