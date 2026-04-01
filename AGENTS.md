@@ -64,6 +64,11 @@ Use these by default when needed:
 5. If a dependency (pip package) is needed, ask first before installing it.
 6. Remember and pin versions and their hashes
 
+**When something looks wrong:**
+7. If a package was published <48 hours ago, flag it.
+8. If a maintainer account changed recently, flag it.
+9. If the package name is close to a popular package, flag it (typosquatting).
+
 ### Security and coding best practices scans
 1. Use the tools in .github/workflows also locally to check (before git pushing) if they complain.
 2. If one of the tools complains, try to fix it.
@@ -77,7 +82,7 @@ Use these by default when needed:
 
 Keep the baseline dependency set permissive-license friendly.
 
-You may  add GPL or AGPL dependencies even without explicit user approval.
+You may add GPL or AGPL dependencies even without explicit user approval.
 
 `ripMIME` is allowed because it is treated as an external tool fallback, not a baseline Python package dependency.
 
@@ -329,7 +334,7 @@ At minimum, the processed artifact should retain:
 
 ## Testing Expectations
 
-Add tests as implementation grows.
+Add tests as implementation grows. For every new .py file, make sure there is a decent coverage of test cases. 
 
 Prioritize tests for:
 
