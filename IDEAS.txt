@@ -1,0 +1,64 @@
+# IDEAS
+
+## Optional LLM Candidate Filtering
+
+Goal:
+- Avoid sending obviously non-interesting processed emails to the LLM to reduce cost.
+- First target: clear bounce / DSN / delivery-failure messages.
+
+Recommended approach:
+- Compute a deterministic `llm_filter` decision during `prepare`.
+- Store that decision in the processed JSON artifact.
+- Let `render-batch` optionally honor that decision with a flag such as `--only-llm-candidates`.
+
+Why this shape fits:
+- `prepare` already creates the durable local artifact.
+- `render-batch` already consumes those artifacts and can skip some without changing upstream parsing.
+- Keeping the decision in the artifact makes filtering auditable and testable.
+
+Suggested processed artifact addition:
+- `llm_filter.policy`
+- `llm_filter.keep_for_llm`
+- `llm_filter.reason_codes`
+- `llm_filter.evidence`
+
+Example:
+- keep_for_llm = false
+- reason_codes = ["bounce_dsn", "delivery_status_report"]
+
+V1 classifier scope:
+- Only classify clear bounce/DSN messages.
+- Use strong signals only:
+  - sender patterns like `mailer-daemon` or `postmaster`
+  - subject patterns like `Undelivered Mail` or `Delivery Status Notification`
+  - MIME structure such as `multipart/report` or `message/delivery-status`
+  - canonical text phrases such as `Final-Recipient`, `Diagnostic-Code`, `Action: failed`
+
+Safety rule:
+- Only exclude when signals are strong and unambiguous.
+- Ambiguous messages should remain eligible for LLM processing.
+
+Suggested implementation steps:
+1. Add `llm_filter` metadata to processed artifact models.
+2. Create a small rule-based classifier module.
+3. Run classification during `prepare`.
+4. Log the classification decision in structured logs.
+5. Add an opt-in `render-batch` flag to exclude filtered artifacts.
+6. Optionally write a batch selection manifest showing included/skipped files.
+7. Document behavior in `README.md` and `docs/developer_guide.md`.
+
+Suggested tests:
+- Bounce/DSN fixture is marked `keep_for_llm = false`
+- Normal human email remains `keep_for_llm = true`
+- `render-batch` default behavior remains unchanged
+- `render-batch --only-llm-candidates` skips filtered artifacts
+- Mixed old/new artifacts fail clearly if filter-only mode is requested
+
+Do not do in V1:
+- No new dependency
+- No LLM-based filter decision
+- No broad “interestingness” scoring
+- No filtering of newsletters/autoreplies/lists yet
+
+Open question for later:
+- After bounce/DSN filtering works, decide whether out-of-office and other auto-generated mail should be included in scope.
