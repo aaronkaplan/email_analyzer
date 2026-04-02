@@ -1,6 +1,9 @@
 # Batch Submission
 
-`submit-batch` uploads one rendered OpenAI Batch JSONL shard, creates the batch, polls it to a terminal state, downloads the output and error reports, and writes local metrics under `batch_output/`.
+This repository supports two submission paths for the same rendered batch shard:
+
+1. `submit-batch`: upload one rendered OpenAI Batch JSONL shard, poll it to a terminal state, download the output and error reports, and write local metrics under `batch_output/`
+2. `submit-ollama-batch`: run the same shard locally against one Ollama host, write compatible local output files under `ollama_batch_output/`, and show the same rich progress view style
 
 ## Requirements
 
@@ -27,6 +30,23 @@ Submit an existing shard as-is:
 ```bash
 uv run python -m email_analyzer submit-batch \
   --batch-jsonl output/batches/batch-00001.jsonl
+```
+
+Run the same shard against Ollama instead:
+
+```bash
+uv run python -m email_analyzer submit-ollama-batch \
+  --batch-jsonl output/batches/batch-00001.jsonl
+```
+
+Use explicit Ollama settings instead of env vars when needed:
+
+```bash
+uv run python -m email_analyzer submit-ollama-batch \
+  --batch-jsonl output/batches/batch-00001.jsonl \
+  --base-url http://localhost:11434 \
+  --model gpt-oss:120b \
+  --num-parallel-jobs 1
 ```
 
 Resume monitoring an already-created batch:
@@ -93,6 +113,8 @@ uv run python -m email_analyzer submit-batch \
 ## Prompt Override Behavior
 
 If `--prompt` or `--prompt-from-file` is supplied, `submit-batch` rewrites the source `--batch-jsonl` in place before upload.
+
+`submit-ollama-batch` is safer here: it never rewrites the source shard in place. It writes the effective request set to `batch_input.submitted.jsonl`, and if a prompt override is used it also stores the original shard at `batch_input.before_submit.jsonl`.
 
 Only `body.instructions` is changed.
 
@@ -186,7 +208,7 @@ Before upload, the submitter validates:
 
 ## Live Status Output
 
-During synchronous polling, the command displays a `rich` progress view similar to a lightweight `tqdm` status line.
+During synchronous polling or local Ollama execution, the command displays a `rich` progress view similar to a lightweight `tqdm` status line.
 
 Displayed fields include:
 
@@ -208,6 +230,8 @@ Typical states are:
 3. `finalizing`
 4. terminal state such as `completed`, `failed`, `expired`, or `cancelled`
 
+`submit-ollama-batch` uses the same visible state names, but they are local lifecycle states rather than OpenAI server-side states.
+
 See also [the batch state machine](/docs/batch_state_machine.md).
 
 If `--no-wait` is used, the command records and prints a single observed snapshot instead of polling until terminal state.
@@ -219,6 +243,11 @@ If `--output-dir` is omitted, the default output directory is:
 1. `<batch-parent>/batch_output/<batch-stem>/` for general paths
 2. `<run-root>/batch_output/<batch-stem>/` when the shard lives under `.../batches/`
 3. `batch_output/<batch-id>/` by default when resuming via `--resume-batch-id`
+
+For `submit-ollama-batch`, the default output directory is:
+
+1. `<batch-parent>/ollama_batch_output/<batch-stem>/` for general paths
+2. `<run-root>/ollama_batch_output/<batch-stem>/` when the shard lives under `.../batches/`
 
 Example output layout:
 
@@ -245,6 +274,12 @@ Files:
 6. `batch_output.jsonl`: downloaded successful responses, if present
 7. `batch_errors.jsonl`: downloaded per-request errors, if present
 8. `batch_summary.json`: derived metrics and counts
+
+For `submit-ollama-batch`, the filenames are the same, but:
+
+1. `batch_final.json` is the local synthesized final batch state
+2. `batch_output.jsonl` is a local OpenAI-compatible response file synthesized from Ollama `/api/chat` responses
+3. provider-specific details are nested under `provider_meta`
 
 ## Summary Metrics
 
@@ -284,3 +319,5 @@ The submitter handles:
 9. downloading OpenAI error reports when available
 
 Even for non-success terminal states, the submitter writes local artifacts so the failure remains auditable.
+
+`submit-ollama-batch` additionally retries transient transport failures such as connection resets and timeouts before recording a final per-request failure.

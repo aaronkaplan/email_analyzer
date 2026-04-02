@@ -6,9 +6,12 @@ from pathlib import Path
 SCHEMA_VERSION = "email_analyzer.processed.v1"
 ERROR_SCHEMA_VERSION = "email_analyzer.error.v1"
 OPENAI_BATCH_ENDPOINT = "/v1/responses"
+OLLAMA_CHAT_ENDPOINT = "/api/chat"
 DEFAULT_BATCH_MAX_REQUESTS = 50_000
 DEFAULT_BATCH_MAX_BYTES = 190 * 1024 * 1024
 DEFAULT_BATCH_POLL_INTERVAL_SECONDS = 15
+DEFAULT_OLLAMA_NUM_PARALLEL_JOBS = 3
+DEFAULT_OLLAMA_REQUEST_TIMEOUT_SECONDS = 600
 DEFAULT_REPLY_PARSER_LANGUAGES = [
     "en",
     "de",
@@ -90,6 +93,18 @@ class BatchSubmitConfig:
     poll_interval_seconds: int = DEFAULT_BATCH_POLL_INTERVAL_SECONDS
     completion_window: str = "24h"
     no_wait: bool = False
+
+
+@dataclass(slots=True)
+class OllamaBatchSubmitConfig:
+    batch_jsonl: Path
+    output_dir: Path | None = None
+    base_url: str | None = None
+    model: str | None = None
+    prompt: str | None = None
+    prompt_from_file: Path | None = None
+    num_parallel_jobs: int = DEFAULT_OLLAMA_NUM_PARALLEL_JOBS
+    request_timeout_seconds: int = DEFAULT_OLLAMA_REQUEST_TIMEOUT_SECONDS
 
 
 @dataclass(slots=True)

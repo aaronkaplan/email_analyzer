@@ -69,8 +69,9 @@ The current CLI surface is:
 1. `prepare`: parse raw emails and write one reduced JSON artifact per file
 2. `render-batch`: render `/v1/responses` batch JSONL from processed artifacts
 3. `submit-batch`: upload one rendered shard, poll it, and download output files
-4. `batch-output-to-xlsx`: export successful structured batch output to `.xlsx`
-5. `flatten-mailbox`: turn `mbox` or `mbox.gz` archives into one `.eml` file per message
+4. `submit-ollama-batch`: run one rendered shard locally against an Ollama host
+5. `batch-output-to-xlsx`: export successful structured batch output to `.xlsx`
+6. `flatten-mailbox`: turn `mbox` or `mbox.gz` archives into one `.eml` file per message
 
 Examples:
 
@@ -78,6 +79,7 @@ Examples:
 uv run python -m email_analyzer prepare --input input --output output --logs logs --workers 8
 uv run python -m email_analyzer render-batch --processed output --batch-dir output/batches --model gpt-4o-mini
 uv run python -m email_analyzer submit-batch --batch-jsonl output/batches/batch-00001.jsonl
+uv run python -m email_analyzer submit-ollama-batch --batch-jsonl output/batches/batch-00001.jsonl --model gpt-oss:120b
 uv run python -m email_analyzer batch-output-to-xlsx --input-jsonl output/batch_output/batch-00001/batch_output.jsonl
 ```
 

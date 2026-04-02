@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760" role="img" aria-labelledby="title desc">
   <title id="title">Email Analyzer workflow</title>
-  <desc id="desc">Raw emails move through prepare, render-batch, submit-batch, and batch-output-to-xlsx to produce JSON, batch JSONL, batch results, and XLSX output.</desc>
+  <desc id="desc">Raw emails move through prepare and render-batch into a JSONL shard that can be submitted to either OpenAI batch processing or a local Ollama host, then exported to XLSX.</desc>
 
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
@@ -110,10 +110,10 @@
     </style>
   </defs>
 
-  <rect x="0.5" y="0.5" width="1399" height="559" rx="24" fill="#ffffff" stroke="#e5e7eb" stroke-width="1"/>
+  <rect x="0.5" y="0.5" width="1399" height="759" rx="24" fill="#ffffff" stroke="#e5e7eb" stroke-width="1"/>
 
   <text x="56" y="56" class="title">Email Analyzer Workflow</text>
-  <text x="56" y="84" class="subtitle">Raw emails become reduced JSON, batch JSONL, OpenAI results, and optional XLSX output.</text>
+  <text x="56" y="84" class="subtitle">Raw emails become reduced JSON, batch JSONL, OpenAI or Ollama results, and optional XLSX output.</text>
 
   <rect x="998" y="20" width="346" height="86" rx="18" class="callout"/>
   <text x="1022" y="46" class="note-title">Stable identity</text>
@@ -163,7 +163,7 @@
 
   <rect x="40" y="300" width="1320" height="200" rx="22" class="panel-optional"/>
   <text x="68" y="332" class="section-label">Optional OpenAI submission + export</text>
-  <text x="68" y="356" class="subtitle">Use Structured Outputs with a schema file, then submit the shard and export successful results to Excel.</text>
+  <text x="68" y="356" class="subtitle">Use Structured Outputs with a schema file, then submit the shard to OpenAI Batch API and export successful results to Excel.</text>
 
   <rect x="80" y="392" width="200" height="92" rx="18" class="process-box"/>
   <text x="180" y="428" class="box-title-tight">submit-batch</text>
@@ -189,4 +189,34 @@
   <path d="M 280 438 H 350" class="arrow"/>
   <path d="M 670 438 H 740" class="arrow"/>
   <path d="M 1000 438 H 1070" class="arrow"/>
+
+  <rect x="40" y="520" width="1320" height="200" rx="22" class="panel-optional"/>
+  <text x="68" y="552" class="section-label">Optional Ollama submission + export</text>
+  <text x="68" y="576" class="subtitle">Run the same rendered shard locally against one Ollama host, then export successful structured results to Excel.</text>
+
+  <rect x="80" y="612" width="230" height="92" rx="18" class="process-box"/>
+  <text x="195" y="646" class="box-title-tight">submit-ollama-batch</text>
+  <text x="195" y="670" class="box-body">uses OLLAMA_BASE_URL</text>
+  <text x="195" y="688" class="box-body">and OLLAMA_MODEL</text>
+
+  <rect x="380" y="612" width="330" height="92" rx="14" class="data-box"/>
+  <path d="M 674 612 H 696 Q 710 612 710 626 V 648 Z" class="data-fold"/>
+  <path d="M 674 612 L 710 648" class="data-fold-line"/>
+  <text x="545" y="646" class="box-title-tight">ollama_batch_output/batch-00001/</text>
+  <text x="545" y="670" class="box-body">batch_output.jsonl + summary files</text>
+
+  <rect x="780" y="612" width="260" height="92" rx="18" class="process-box"/>
+  <text x="910" y="646" class="box-title-tight">batch-output-to-xlsx</text>
+  <text x="910" y="670" class="box-body">same downstream export</text>
+
+  <rect x="1110" y="612" width="180" height="92" rx="14" class="data-box"/>
+  <path d="M 1254 612 H 1276 Q 1290 612 1290 626 V 648 Z" class="data-fold"/>
+  <path d="M 1254 612 L 1290 648" class="data-fold-line"/>
+  <text x="1200" y="648" class="box-title">.xlsx</text>
+  <text x="1200" y="674" class="box-body">spreadsheet export</text>
+
+  <path d="M 1170 266 V 594 H 195 V 612" class="arrow"/>
+  <path d="M 310 658 H 380" class="arrow"/>
+  <path d="M 710 658 H 780" class="arrow"/>
+  <path d="M 1040 658 H 1110" class="arrow"/>
 </svg>

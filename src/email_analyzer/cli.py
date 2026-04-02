@@ -12,10 +12,12 @@ from .config import (
     BatchOutputXlsxConfig,
     BatchSubmitConfig,
     FlattenMailboxConfig,
+    OllamaBatchSubmitConfig,
     PrepareConfig,
     RenderBatchConfig,
 )
 from .mailbox_flatten import run_flatten_mailbox
+from .ollama_batch_submitter import run_ollama_batch_submitter
 from .prepare import run_prepare
 from .render_batch import run_render_batch
 
@@ -100,6 +102,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     submit_parser.add_argument("--no-wait", dest="no_wait", action="store_true")
 
+    ollama_submit_parser = subparsers.add_parser(
+        "submit-ollama-batch",
+        help="Run one rendered batch JSONL shard locally against Ollama",
+    )
+    ollama_submit_parser.add_argument(
+        "--batch-jsonl", dest="batch_jsonl", required=True, type=Path
+    )
+    ollama_submit_parser.add_argument("--output-dir", dest="output_dir", type=Path)
+    ollama_submit_parser.add_argument("--base-url", dest="base_url")
+    ollama_submit_parser.add_argument("--model", dest="model")
+    ollama_prompt_group = ollama_submit_parser.add_mutually_exclusive_group()
+    ollama_prompt_group.add_argument("--prompt", dest="prompt")
+    ollama_prompt_group.add_argument(
+        "--prompt-from-file", dest="prompt_from_file", type=Path
+    )
+    ollama_submit_parser.add_argument(
+        "--num-parallel-jobs", dest="num_parallel_jobs", type=int, default=1
+    )
+    ollama_submit_parser.add_argument(
+        "--request-timeout-seconds",
+        dest="request_timeout_seconds",
+        type=int,
+        default=600,
+    )
+
     export_parser = subparsers.add_parser(
         "batch-output-to-xlsx", help="Convert OpenAI batch output JSONL into XLSX"
     )
@@ -159,6 +186,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             no_wait=args.no_wait,
         )
         return run_batch_submitter(config)
+
+    if args.command == "submit-ollama-batch":
+        config = OllamaBatchSubmitConfig(
+            batch_jsonl=args.batch_jsonl,
+            output_dir=args.output_dir,
+            base_url=args.base_url,
+            model=args.model,
+            prompt=args.prompt,
+            prompt_from_file=args.prompt_from_file,
+            num_parallel_jobs=max(1, args.num_parallel_jobs),
+            request_timeout_seconds=max(1, args.request_timeout_seconds),
+        )
+        return run_ollama_batch_submitter(config)
 
     if args.command == "batch-output-to-xlsx":
         config = BatchOutputXlsxConfig(
