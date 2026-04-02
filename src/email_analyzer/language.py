@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 try:
     from lingua import LanguageDetectorBuilder
 except ImportError:  # pragma: no cover - package namespace collision fallback
     from lingua.lingua import LanguageDetectorBuilder
-
-_DETECTOR = None
 
 
 def detect_language(text: str) -> dict[str, Any] | None:
@@ -24,7 +23,9 @@ def detect_language(text: str) -> dict[str, Any] | None:
     confidence = None
 
     try:
-        confidence = round(float(detector.compute_language_confidence(cleaned, language)), 6)
+        confidence = round(
+            float(detector.compute_language_confidence(cleaned, language)), 6
+        )
     except Exception:
         confidence = None
 
@@ -35,8 +36,6 @@ def detect_language(text: str) -> dict[str, Any] | None:
     }
 
 
+@lru_cache(maxsize=1)
 def _get_detector():
-    global _DETECTOR
-    if _DETECTOR is None:
-        _DETECTOR = LanguageDetectorBuilder.from_all_languages().build()
-    return _DETECTOR
+    return LanguageDetectorBuilder.from_all_languages().build()

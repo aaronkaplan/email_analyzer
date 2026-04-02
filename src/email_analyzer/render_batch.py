@@ -5,7 +5,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config import DEFAULT_OPENAI_INSTRUCTIONS, OPENAI_BATCH_ENDPOINT, RenderBatchConfig
+from .config import (
+    DEFAULT_OPENAI_INSTRUCTIONS,
+    OPENAI_BATCH_ENDPOINT,
+    RenderBatchConfig,
+)
 
 
 def run_render_batch(config: RenderBatchConfig) -> int:
@@ -27,7 +31,9 @@ def run_render_batch(config: RenderBatchConfig) -> int:
 
     for processed_path in processed_files:
         processed = json.loads(processed_path.read_text(encoding="utf-8"))
-        line = _render_line(processed, config.model, instructions, response_format=response_format)
+        line = _render_line(
+            processed, config.model, instructions, response_format=response_format
+        )
         # Keep JSONL records ASCII-escaped so Unicode line-separator code points
         # inside email text cannot be misread as record boundaries.
         encoded_line = json.dumps(line, ensure_ascii=True, sort_keys=True)
@@ -75,14 +81,16 @@ def _load_schema_format(schema_file: Path | None) -> dict[str, Any] | None:
 
     schema_class = getattr(module, "mySchema", None)
     if schema_class is None:
-        raise ValueError(f"Schema file must define class mySchema(BaseModel): {schema_file}")
+        raise ValueError(
+            f"Schema file must define class mySchema(BaseModel): {schema_file}"
+        )
 
     model_json_schema = getattr(schema_class, "model_json_schema", None)
     if not callable(model_json_schema):
         raise ValueError(f"mySchema must provide model_json_schema(): {schema_file}")
 
     schema_name = getattr(schema_class, "__name__", "mySchema")
-    schema = model_json_schema()
+    schema = schema_class.model_json_schema()
     _ensure_strict_json_schema(schema)
 
     return {
@@ -127,9 +135,15 @@ def _render_line(
         "kept_snippets": processed.get("kept_snippets", []),
         "attachments": processed.get("attachments", []),
         "stats": {
-            "estimated_total_tokens": processed.get("stats", {}).get("estimated_total_tokens", 0),
-            "kept_snippet_count": processed.get("stats", {}).get("kept_snippet_count", 0),
-            "dropped_part_count": processed.get("stats", {}).get("dropped_part_count", 0),
+            "estimated_total_tokens": processed.get("stats", {}).get(
+                "estimated_total_tokens", 0
+            ),
+            "kept_snippet_count": processed.get("stats", {}).get(
+                "kept_snippet_count", 0
+            ),
+            "dropped_part_count": processed.get("stats", {}).get(
+                "dropped_part_count", 0
+            ),
         },
     }
 
@@ -142,7 +156,9 @@ def _render_line(
                 "content": [
                     {
                         "type": "input_text",
-                        "text": json.dumps(email_package, ensure_ascii=False, sort_keys=True),
+                        "text": json.dumps(
+                            email_package, ensure_ascii=False, sort_keys=True
+                        ),
                     }
                 ],
             }
@@ -177,7 +193,9 @@ def _write_shards(config: RenderBatchConfig, shards: list[list[str]]) -> None:
         _write_text_atomic(target, "\n".join(shard) + ("\n" if shard else ""))
 
     if len(shards) == 1:
-        _write_text_atomic(batch_alias, "\n".join(shards[0]) + ("\n" if shards[0] else ""))
+        _write_text_atomic(
+            batch_alias, "\n".join(shards[0]) + ("\n" if shards[0] else "")
+        )
 
 
 def _write_text_atomic(path: Path, content: str) -> None:

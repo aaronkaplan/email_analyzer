@@ -9,17 +9,50 @@ from time import perf_counter_ns
 from typing import Any
 
 from .config import ERROR_SCHEMA_VERSION, PrepareConfig, SCHEMA_VERSION
-from .dedupe import choose_canonical_body, filter_duplicate_body_representations, is_attachment_like, is_body_like
+from .dedupe import (
+    choose_canonical_body,
+    filter_duplicate_body_representations,
+    is_attachment_like,
+    is_body_like,
+)
 from .html import normalize_for_dedupe
 from .language import detect_language
-from .logging_utils import configure_worker_logging, get_logger, log_event, start_logging, stop_logging
-from .metrics import aggregate_step_metrics, estimate_token_count, measure_step, total_duration_ms
-from .mime import build_part_inventory, collect_parser_defects, decode_parts, is_textual_part, parse_email_bytes, select_headers
-from .models import AttachmentSummary, DroppedPart, PartAnalysis, ProcessedEmail, Snippet
+from .logging_utils import (
+    configure_worker_logging,
+    get_logger,
+    log_event,
+    start_logging,
+    stop_logging,
+)
+from .metrics import (
+    aggregate_step_metrics,
+    estimate_token_count,
+    measure_step,
+    total_duration_ms,
+)
+from .mime import (
+    build_part_inventory,
+    collect_parser_defects,
+    decode_parts,
+    is_textual_part,
+    parse_email_bytes,
+    select_headers,
+)
+from .models import (
+    AttachmentSummary,
+    DroppedPart,
+    PartAnalysis,
+    ProcessedEmail,
+    Snippet,
+)
 from .quote_strip import strip_reply_text
 
 
-def run_prepare(config: PrepareConfig, executor_factory: type[ProcessPoolExecutor] | type[ThreadPoolExecutor] = ProcessPoolExecutor) -> int:
+def run_prepare(
+    config: PrepareConfig,
+    executor_factory: type[ProcessPoolExecutor]
+    | type[ThreadPoolExecutor] = ProcessPoolExecutor,
+) -> int:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     config.logs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -56,18 +89,24 @@ def run_prepare(config: PrepareConfig, executor_factory: type[ProcessPoolExecuto
 
         with executor_factory(**executor_kwargs) as executor:
             future_map = {
-                executor.submit(process_email_file, input_path, config): input_path for input_path in input_files
+                executor.submit(process_email_file, input_path, config): input_path
+                for input_path in input_files
             }
 
             for future in as_completed(future_map):
                 summary = future.result()
                 summaries.append(summary)
-                with file_summary_path.open("a", encoding="utf-8") as file_summary_handle:
-                    file_summary_handle.write(json.dumps(summary, ensure_ascii=False, sort_keys=True) + "\n")
+                with file_summary_path.open(
+                    "a", encoding="utf-8"
+                ) as file_summary_handle:
+                    file_summary_handle.write(
+                        json.dumps(summary, ensure_ascii=False, sort_keys=True) + "\n"
+                    )
 
         step_summary = aggregate_step_metrics(summaries)
         (config.logs_dir / "step_summary.json").write_text(
-            json.dumps(step_summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            json.dumps(step_summary, ensure_ascii=False, indent=2, sort_keys=True)
+            + "\n",
             encoding="utf-8",
         )
     finally:
@@ -86,7 +125,9 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
     error_path = config.output_dir / f"{email_id}.error.json"
 
     try:
-        parsed, duration_ms = measure_step("parse_source", timings, _parse_source, input_path)
+        parsed, duration_ms = measure_step(
+            "parse_source", timings, _parse_source, input_path
+        )
         _raw_bytes, message, headers, parser_defects = parsed
         log_event(
             logger,
@@ -102,7 +143,9 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
             parser_defect_count=len(parser_defects),
         )
 
-        parts, duration_ms = measure_step("inventory_parts", timings, build_part_inventory, message)
+        parts, duration_ms = measure_step(
+            "inventory_parts", timings, build_part_inventory, message
+        )
         textish_count = sum(1 for part in parts if is_textual_part(part))
         log_event(
             logger,
@@ -117,8 +160,12 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
             text_part_count=textish_count,
         )
 
-        parts, duration_ms = measure_step("decode_and_canonicalize", timings, decode_parts, parts)
-        charset_fallback_count = sum(1 for part in parts if part.charset_source == "charset-normalizer")
+        parts, duration_ms = measure_step(
+            "decode_and_canonicalize", timings, decode_parts, parts
+        )
+        charset_fallback_count = sum(
+            1 for part in parts if part.charset_source == "charset-normalizer"
+        )
         decoded_text_part_count = sum(1 for part in parts if part.visible_text)
         log_event(
             logger,
@@ -133,7 +180,9 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
             charset_fallback_count=charset_fallback_count,
         )
 
-        canonical_body, duration_ms = measure_step("choose_canonical_body", timings, choose_canonical_body, parts)
+        canonical_body, duration_ms = measure_step(
+            "choose_canonical_body", timings, choose_canonical_body, parts
+        )
         log_event(
             logger,
             "Selected canonical body",
@@ -144,7 +193,9 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
             email_id=email_id,
             source_filename=email_id,
             canonical_part_path=canonical_body.path if canonical_body else None,
-            canonical_content_type=canonical_body.content_type if canonical_body else None,
+            canonical_content_type=canonical_body.content_type
+            if canonical_body
+            else None,
         )
 
         dropped_by_path, duration_ms = measure_step(
@@ -208,11 +259,14 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
             timings,
             _triage_parts,
             parts,
-            canonical_body,
             dropped_by_path,
         )
-        body_parts, attachment_parts, attachment_summaries, dropped_by_path = triage_result
-        dropped_attachment_count = sum(1 for summary in attachment_summaries if not summary.kept)
+        body_parts, attachment_parts, attachment_summaries, dropped_by_path = (
+            triage_result
+        )
+        dropped_attachment_count = sum(
+            1 for summary in attachment_summaries if not summary.kept
+        )
         log_event(
             logger,
             "Triaged attachment parts",
@@ -222,7 +276,9 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
             duration_ms=duration_ms,
             email_id=email_id,
             source_filename=email_id,
-            kept_attachment_count=sum(1 for summary in attachment_summaries if summary.kept),
+            kept_attachment_count=sum(
+                1 for summary in attachment_summaries if summary.kept
+            ),
             dropped_attachment_count=dropped_attachment_count,
         )
         for dropped_part in dropped_by_path.values():
@@ -372,7 +428,11 @@ def _parse_source(input_path: Path) -> tuple[bytes, Any, dict[str, Any], list[st
 
 def _strip_canonical_body(canonical_body: PartAnalysis | None):
     if canonical_body is None or not canonical_body.visible_text:
-        return canonical_body, {"tool": "mail-parser-reply", "changed": False, "characters_removed": 0}
+        return canonical_body, {
+            "tool": "mail-parser-reply",
+            "changed": False,
+            "characters_removed": 0,
+        }
 
     stripped_text, metadata = strip_reply_text(canonical_body.visible_text)
     canonical_body.visible_text = stripped_text
@@ -382,10 +442,18 @@ def _strip_canonical_body(canonical_body: PartAnalysis | None):
 
 def _triage_parts(
     parts: list[PartAnalysis],
-    canonical_body: PartAnalysis | None,
     dropped_by_path: dict[str, DroppedPart],
-) -> tuple[list[PartAnalysis], list[PartAnalysis], list[AttachmentSummary], dict[str, DroppedPart]]:
-    body_parts = [part for part in parts if is_body_like(part) and part.path not in dropped_by_path]
+) -> tuple[
+    list[PartAnalysis],
+    list[PartAnalysis],
+    list[AttachmentSummary],
+    dict[str, DroppedPart],
+]:
+    body_parts = [
+        part
+        for part in parts
+        if is_body_like(part) and part.path not in dropped_by_path
+    ]
     attachment_parts = []
     attachment_summaries: list[AttachmentSummary] = []
 
@@ -455,17 +523,29 @@ def _build_snippets(
     snippets: list[Snippet] = []
 
     if canonical_body is not None and canonical_body.visible_text:
-        snippets.append(_part_to_snippet(canonical_body, kind="canonical_body", snippet_id="canonical_body"))
+        snippets.append(
+            _part_to_snippet(
+                canonical_body, kind="canonical_body", snippet_id="canonical_body"
+            )
+        )
 
     additional_body_parts = sorted(
-        [part for part in body_parts if canonical_body is None or part.path != canonical_body.path],
+        [
+            part
+            for part in body_parts
+            if canonical_body is None or part.path != canonical_body.path
+        ],
         key=lambda part: len(part.visible_text or ""),
         reverse=True,
     )
     for index, part in enumerate(additional_body_parts, start=1):
         if not part.visible_text:
             continue
-        snippets.append(_part_to_snippet(part, kind="additional_body", snippet_id=f"additional_body_{index}"))
+        snippets.append(
+            _part_to_snippet(
+                part, kind="additional_body", snippet_id=f"additional_body_{index}"
+            )
+        )
 
     sorted_attachment_parts = sorted(
         [part for part in attachment_parts if part.visible_text],
@@ -473,7 +553,9 @@ def _build_snippets(
         reverse=True,
     )
     for index, part in enumerate(sorted_attachment_parts, start=1):
-        snippets.append(_part_to_snippet(part, kind="attachment", snippet_id=f"attachment_{index}"))
+        snippets.append(
+            _part_to_snippet(part, kind="attachment", snippet_id=f"attachment_{index}")
+        )
 
     return snippets
 
@@ -509,8 +591,12 @@ def _build_processed_email(
     attachment_summaries: list[AttachmentSummary],
     source_bytes: int,
 ) -> ProcessedEmail:
-    canonical_snippet = next((snippet for snippet in snippets if snippet.kind == "canonical_body"), None)
-    dropped_parts = sorted(dropped_by_path.values(), key=lambda item: item.source_part_path)
+    canonical_snippet = next(
+        (snippet for snippet in snippets if snippet.kind == "canonical_body"), None
+    )
+    dropped_parts = sorted(
+        dropped_by_path.values(), key=lambda item: item.source_part_path
+    )
     estimated_total_tokens = sum(snippet.token_estimate for snippet in snippets)
 
     return ProcessedEmail(
@@ -543,5 +629,8 @@ def _write_processed_email(output_path: Path, processed_email: ProcessedEmail) -
 def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = path.with_name(f".{path.name}.tmp")
-    temporary_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     temporary_path.replace(path)
