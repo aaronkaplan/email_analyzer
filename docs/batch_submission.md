@@ -208,6 +208,8 @@ Typical states are:
 3. `finalizing`
 4. terminal state such as `completed`, `failed`, `expired`, or `cancelled`
 
+See also [the batch state machine](/docs/batch_state_machine.md).
+
 If `--no-wait` is used, the command records and prints a single observed snapshot instead of polling until terminal state.
 
 ## Output Layout
