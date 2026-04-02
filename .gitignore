@@ -20,3 +20,5 @@ batch_output/
 logs/
 benchmarks/*
 .env
+
+.ruff_cache/*
