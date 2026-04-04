@@ -49,6 +49,19 @@ uv run python -m email_analyzer submit-ollama-batch \
   --num-parallel-jobs 1
 ```
 
+Run one rendered shard across multiple Ollama servers by repeating `--base-url`:
+
+```bash
+uv run python -m email_analyzer submit-ollama-batch \
+  --batch-jsonl output/batches/batch-00001.jsonl \
+  --model gemma4:latest \
+  --base-url http://nanu:11434 \
+  --base-url http://nanu:11435 \
+  --base-url http://nanu:11436 \
+  --num-shards 3 \
+  --num-parallel-jobs 1
+```
+
 Resume monitoring an already-created batch:
 
 ```bash
@@ -133,6 +146,54 @@ For auditability, the command also copies the pre-rewrite file into `batch_outpu
 Prompt overrides are only allowed when creating a new submission from `--batch-jsonl`.
 
 They are rejected with `--resume-batch-id`.
+
+## Sharded Ollama Submission
+
+`submit-ollama-batch` can split one rendered batch shard across multiple Ollama servers.
+
+Use sharded mode when:
+
+1. you have multiple pinned Ollama instances, often one per GPU
+2. you want one logical batch result directory with merged outputs
+3. all shards should use the same provider model and prompt override
+
+Rules:
+
+1. provide one `--base-url` per shard
+2. `--num-shards` is optional when it matches the number of `--base-url` values
+3. if `--num-shards` is supplied, it must equal the number of `--base-url` values
+4. `--num-parallel-jobs` is per shard, not global
+5. total possible concurrent requests is `num_shards * num_parallel_jobs`
+6. sharding is deterministic and currently uses round-robin request assignment by input line order
+
+Example:
+
+```bash
+uv run python -m email_analyzer submit-ollama-batch \
+  --batch-jsonl output/batches/batch-00001.jsonl \
+  --model gemma4:latest \
+  --base-url http://nanu:11434 \
+  --base-url http://nanu:11435 \
+  --base-url http://nanu:11436 \
+  --num-parallel-jobs 2
+```
+
+This example implies:
+
+1. `3` shards
+2. shard `0` goes to `http://nanu:11434`
+3. shard `1` goes to `http://nanu:11435`
+4. shard `2` goes to `http://nanu:11436`
+5. each shard may run up to `2` local requests at once
+6. the command may therefore have up to `6` in-flight Ollama requests overall
+
+Output layout in sharded mode:
+
+1. top-level merged files still live under the requested `--output-dir` or the normal `ollama_batch_output/<batch>/` default
+2. shard-specific artifacts are written under `shards/shard-00000/`, `shards/shard-00001/`, and so on
+3. downstream tools should continue to read the merged top-level `batch_output.jsonl`
+
+The merged top-level output keeps the same OpenAI-compatible local contract used by non-sharded Ollama submission.
 
 ## Structured Outputs
 

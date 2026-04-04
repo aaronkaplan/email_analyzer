@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from io import StringIO
 from pathlib import Path
 
@@ -443,3 +445,347 @@ def test_run_ollama_batch_submitter_retries_transient_connection_reset(
 
     assert exit_code == 0
     assert calls["count"] == 3
+
+
+def test_run_ollama_batch_submitter_honors_num_parallel_jobs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    batch_jsonl = tmp_path / "batch.jsonl"
+    requests = []
+    for index in range(20):
+        requests.append(
+            json.dumps(
+                {
+                    "custom_id": f"{index}.eml",
+                    "method": "POST",
+                    "url": "/v1/responses",
+                    "body": {
+                        "model": "gpt-5.4-nano",
+                        "instructions": "Return JSON.",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "input_text",
+                                        "text": json.dumps(
+                                            {"email_id": f"{index}.eml"}
+                                        ),
+                                    }
+                                ],
+                            }
+                        ],
+                        "text": {
+                            "format": {
+                                "type": "json_schema",
+                                "name": "mySchema",
+                                "schema": {"type": "object"},
+                                "strict": True,
+                            }
+                        },
+                    },
+                },
+                sort_keys=True,
+            )
+        )
+    batch_jsonl.write_text("\n".join(requests) + "\n", encoding="utf-8")
+
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://nanu:11434")
+    monkeypatch.setenv("OLLAMA_MODEL", "gpt-oss:120b")
+
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def fake_executor(
+        base_url: str, payload: dict[str, object], timeout: int
+    ) -> dict[str, object]:
+        nonlocal active, max_active
+        assert base_url == "http://nanu:11434"
+        assert timeout == 600
+        assert payload["model"] == "gpt-oss:120b"
+
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+
+        time.sleep(0.2)
+
+        with lock:
+            active -= 1
+
+        return {
+            "model": "gpt-oss:120b",
+            "created_at": "2026-04-02T12:00:00Z",
+            "message": {"role": "assistant", "content": "{}"},
+            "done": True,
+            "done_reason": "stop",
+        }
+
+    exit_code = run_ollama_batch_submitter(
+        OllamaBatchSubmitConfig(batch_jsonl=batch_jsonl, num_parallel_jobs=12),
+        request_executor=fake_executor,
+        console=Console(file=StringIO(), force_terminal=False, color_system=None),
+    )
+
+    assert exit_code == 0
+    assert max_active == 12
+
+
+def test_run_ollama_batch_submitter_shards_across_multiple_base_urls(
+    tmp_path: Path,
+) -> None:
+    batch_jsonl = tmp_path / "output" / "batches" / "batch-00001.jsonl"
+    batch_jsonl.parent.mkdir(parents=True)
+
+    requests = []
+    for custom_id in ("a.eml", "b.eml", "c.eml", "d.eml", "e.eml", "f.eml"):
+        requests.append(
+            json.dumps(
+                {
+                    "custom_id": custom_id,
+                    "method": "POST",
+                    "url": "/v1/responses",
+                    "body": {
+                        "model": "gpt-5.4-nano",
+                        "instructions": "Return JSON.",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "input_text",
+                                        "text": json.dumps({"email_id": custom_id}),
+                                    }
+                                ],
+                            }
+                        ],
+                        "text": {
+                            "format": {
+                                "type": "json_schema",
+                                "name": "mySchema",
+                                "schema": {"type": "object"},
+                                "strict": True,
+                            }
+                        },
+                    },
+                },
+                sort_keys=True,
+            )
+        )
+    batch_jsonl.write_text("\n".join(requests) + "\n", encoding="utf-8")
+
+    seen_by_url: dict[str, list[str]] = {
+        "http://nanu:11434": [],
+        "http://nanu:11435": [],
+        "http://nanu:11436": [],
+    }
+
+    def fake_executor(
+        base_url: str, payload: dict[str, object], timeout: int
+    ) -> dict[str, object]:
+        assert timeout == 600
+        assert payload["model"] == "gemma4:latest"
+        messages = payload["messages"]
+        assert isinstance(messages, list)
+        parsed = json.loads(messages[-1]["content"])
+        seen_by_url[base_url].append(parsed["email_id"])
+        return {
+            "model": "gemma4:latest",
+            "created_at": "2026-04-02T12:00:00Z",
+            "message": {
+                "role": "assistant",
+                "content": json.dumps({"summary": parsed["email_id"]}),
+            },
+            "done": True,
+            "done_reason": "stop",
+            "prompt_eval_count": 4,
+            "eval_count": 2,
+        }
+
+    exit_code = run_ollama_batch_submitter(
+        OllamaBatchSubmitConfig(
+            batch_jsonl=batch_jsonl,
+            base_urls=(
+                "http://nanu:11434",
+                "http://nanu:11435",
+                "http://nanu:11436",
+            ),
+            num_shards=3,
+            model="gemma4:latest",
+            num_parallel_jobs=2,
+        ),
+        request_executor=fake_executor,
+        console=Console(file=StringIO(), force_terminal=False, color_system=None),
+    )
+
+    assert exit_code == 0
+    assert seen_by_url == {
+        "http://nanu:11434": ["a.eml", "d.eml"],
+        "http://nanu:11435": ["b.eml", "e.eml"],
+        "http://nanu:11436": ["c.eml", "f.eml"],
+    }
+
+    output_dir = tmp_path / "output" / "ollama_batch_output" / "batch-00001"
+    summary = json.loads(
+        (output_dir / "batch_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["provider_meta"]["num_shards"] == 3
+    assert summary["provider_meta"]["per_shard_num_parallel_jobs"] == 2
+    assert summary["provider_meta"]["total_possible_parallel_requests"] == 6
+
+    output_lines = [
+        json.loads(line)
+        for line in (output_dir / "batch_output.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip()
+    ]
+    assert [line["custom_id"] for line in output_lines] == [
+        "a.eml",
+        "b.eml",
+        "c.eml",
+        "d.eml",
+        "e.eml",
+        "f.eml",
+    ]
+    assert summary["status"] == "completed"
+
+
+def test_run_ollama_batch_submitter_rejects_mismatched_num_shards_and_base_urls(
+    tmp_path: Path,
+) -> None:
+    batch_jsonl = tmp_path / "batch.jsonl"
+    batch_jsonl.write_text(
+        json.dumps(
+            {
+                "custom_id": "a.eml",
+                "method": "POST",
+                "url": "/v1/responses",
+                "body": {
+                    "model": "gpt-5.4-nano",
+                    "instructions": "Return JSON.",
+                    "input": [
+                        {
+                            "role": "user",
+                            "content": [{"type": "input_text", "text": "{}"}],
+                        }
+                    ],
+                    "text": {
+                        "format": {
+                            "type": "json_schema",
+                            "name": "mySchema",
+                            "schema": {"type": "object"},
+                            "strict": True,
+                        }
+                    },
+                },
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    exit_code = run_ollama_batch_submitter(
+        OllamaBatchSubmitConfig(
+            batch_jsonl=batch_jsonl,
+            base_urls=("http://nanu:11434", "http://nanu:11435"),
+            num_shards=3,
+            model="gemma4:latest",
+        ),
+        request_executor=lambda base_url, payload, timeout: {},
+        console=Console(file=StringIO(), force_terminal=False, color_system=None),
+    )
+
+    assert exit_code == 1
+    summary = json.loads(
+        (tmp_path / "ollama_batch_output" / "batch" / "batch_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert summary["status"] == "submitter_error"
+    assert "--num-shards must equal" in summary["error"]
+
+
+def test_run_ollama_batch_submitter_sharded_mode_reports_aggregate_progress(
+    tmp_path: Path,
+) -> None:
+    batch_jsonl = tmp_path / "batch.jsonl"
+    requests = []
+    for custom_id in ("a.eml", "b.eml", "c.eml"):
+        requests.append(
+            json.dumps(
+                {
+                    "custom_id": custom_id,
+                    "method": "POST",
+                    "url": "/v1/responses",
+                    "body": {
+                        "model": "gpt-5.4-nano",
+                        "instructions": "Return JSON.",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "input_text",
+                                        "text": json.dumps({"email_id": custom_id}),
+                                    }
+                                ],
+                            }
+                        ],
+                        "text": {
+                            "format": {
+                                "type": "json_schema",
+                                "name": "mySchema",
+                                "schema": {"type": "object"},
+                                "strict": True,
+                            }
+                        },
+                    },
+                },
+                sort_keys=True,
+            )
+        )
+    batch_jsonl.write_text("\n".join(requests) + "\n", encoding="utf-8")
+
+    def fake_executor(
+        base_url: str, payload: dict[str, object], timeout: int
+    ) -> dict[str, object]:
+        messages = payload["messages"]
+        assert isinstance(messages, list)
+        parsed = json.loads(messages[-1]["content"])
+        return {
+            "model": "gemma4:latest",
+            "created_at": "2026-04-02T12:00:00Z",
+            "message": {
+                "role": "assistant",
+                "content": json.dumps({"summary": parsed["email_id"]}),
+            },
+            "done": True,
+            "done_reason": "stop",
+            "prompt_eval_count": 4,
+            "eval_count": 2,
+        }
+
+    reporter = RecordingReporter()
+    exit_code = run_ollama_batch_submitter(
+        OllamaBatchSubmitConfig(
+            batch_jsonl=batch_jsonl,
+            base_urls=("http://nanu:11434", "http://nanu:11435", "http://nanu:11436"),
+            model="gemma4:latest",
+            num_parallel_jobs=1,
+        ),
+        request_executor=fake_executor,
+        reporter=reporter,
+        console=Console(file=StringIO(), force_terminal=False, color_system=None),
+    )
+
+    assert exit_code == 0
+    assert reporter.events[0][:2] == ("start", "validating")
+    assert reporter.events[-1][:2] == ("stop", "completed")
+    assert any(
+        event[0] == "update" and event[1] == "in_progress" and event[3] > 0
+        for event in reporter.events
+    )

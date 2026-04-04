@@ -99,6 +99,28 @@ uv run python -m email_analyzer batch-output-to-xlsx \
   --schema-file docs/structured_output_schema_example.py
 ```
 
+If you want to shard one Ollama batch across multiple pinned Ollama servers, repeat
+`--base-url` once per shard:
+
+```bash
+uv run python -m email_analyzer submit-ollama-batch \
+  --batch-jsonl output/batches/batch-00001.jsonl \
+  --model gemma4:latest \
+  --base-url http://nanu:11434 \
+  --base-url http://nanu:11435 \
+  --base-url http://nanu:11436 \
+  --num-shards 3 \
+  --num-parallel-jobs 1
+```
+
+Notes:
+
+1. `--num-shards` is optional when the number of `--base-url` values already makes the shard count obvious.
+2. `--num-parallel-jobs` is per shard, not global.
+3. Total possible concurrent requests in sharded mode is `num_shards * num_parallel_jobs`.
+4. The top-level `output/ollama_batch_output/<batch>/batch_output.jsonl` remains the merged file for downstream tools like `batch-output-to-xlsx`.
+5. Full sharded-mode details live in `docs/batch_submission.md`.
+
 By default, `submit-ollama-batch` reads:
 
 1. `OLLAMA_BASE_URL`

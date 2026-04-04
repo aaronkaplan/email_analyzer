@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from email_analyzer import cli
+from email_analyzer.config import DEFAULT_OLLAMA_NUM_PARALLEL_JOBS
 
 
 def test_autoload_dotenv_loads_repo_root_file(monkeypatch, tmp_path: Path) -> None:
@@ -75,3 +76,46 @@ def test_autoload_dotenv_is_noop_when_missing(monkeypatch, tmp_path: Path) -> No
     cli._autoload_dotenv()
 
     assert "OPENAI_API_KEY" not in os.environ
+
+
+def test_submit_ollama_batch_parser_uses_config_default_parallel_jobs() -> None:
+    parser = cli.build_parser()
+
+    args = parser.parse_args(
+        [
+            "submit-ollama-batch",
+            "--batch-jsonl",
+            "batch.jsonl",
+        ]
+    )
+
+    assert args.num_parallel_jobs == DEFAULT_OLLAMA_NUM_PARALLEL_JOBS
+
+
+def test_submit_ollama_batch_parser_collects_multiple_base_urls_and_num_shards() -> (
+    None
+):
+    parser = cli.build_parser()
+
+    args = parser.parse_args(
+        [
+            "submit-ollama-batch",
+            "--batch-jsonl",
+            "batch.jsonl",
+            "--base-url",
+            "http://nanu:11434",
+            "--base-url",
+            "http://nanu:11435",
+            "--base-url",
+            "http://nanu:11436",
+            "--num-shards",
+            "3",
+        ]
+    )
+
+    assert args.base_url == [
+        "http://nanu:11434",
+        "http://nanu:11435",
+        "http://nanu:11436",
+    ]
+    assert args.num_shards == 3

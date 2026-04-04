@@ -100,9 +100,11 @@ class OllamaBatchSubmitConfig:
     batch_jsonl: Path
     output_dir: Path | None = None
     base_url: str | None = None
+    base_urls: tuple[str, ...] = ()
     model: str | None = None
     prompt: str | None = None
     prompt_from_file: Path | None = None
+    num_shards: int | None = None
     num_parallel_jobs: int = DEFAULT_OLLAMA_NUM_PARALLEL_JOBS
     request_timeout_seconds: int = DEFAULT_OLLAMA_REQUEST_TIMEOUT_SECONDS
 

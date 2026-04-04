@@ -11,6 +11,7 @@ from .batch_submitter import run_batch_submitter
 from .config import (
     BatchOutputXlsxConfig,
     BatchSubmitConfig,
+    DEFAULT_OLLAMA_NUM_PARALLEL_JOBS,
     FlattenMailboxConfig,
     OllamaBatchSubmitConfig,
     PrepareConfig,
@@ -110,15 +111,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--batch-jsonl", dest="batch_jsonl", required=True, type=Path
     )
     ollama_submit_parser.add_argument("--output-dir", dest="output_dir", type=Path)
-    ollama_submit_parser.add_argument("--base-url", dest="base_url")
+    ollama_submit_parser.add_argument("--base-url", dest="base_url", action="append")
     ollama_submit_parser.add_argument("--model", dest="model")
     ollama_prompt_group = ollama_submit_parser.add_mutually_exclusive_group()
     ollama_prompt_group.add_argument("--prompt", dest="prompt")
     ollama_prompt_group.add_argument(
         "--prompt-from-file", dest="prompt_from_file", type=Path
     )
+    ollama_submit_parser.add_argument("--num-shards", dest="num_shards", type=int)
     ollama_submit_parser.add_argument(
-        "--num-parallel-jobs", dest="num_parallel_jobs", type=int, default=1
+        "--num-parallel-jobs",
+        dest="num_parallel_jobs",
+        type=int,
+        default=DEFAULT_OLLAMA_NUM_PARALLEL_JOBS,
     )
     ollama_submit_parser.add_argument(
         "--request-timeout-seconds",
@@ -188,13 +193,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_batch_submitter(config)
 
     if args.command == "submit-ollama-batch":
+        base_urls = tuple(args.base_url or [])
         config = OllamaBatchSubmitConfig(
             batch_jsonl=args.batch_jsonl,
             output_dir=args.output_dir,
-            base_url=args.base_url,
+            base_url=base_urls[0] if len(base_urls) == 1 else None,
+            base_urls=base_urls,
             model=args.model,
             prompt=args.prompt,
             prompt_from_file=args.prompt_from_file,
+            num_shards=args.num_shards,
             num_parallel_jobs=max(1, args.num_parallel_jobs),
             request_timeout_seconds=max(1, args.request_timeout_seconds),
         )
