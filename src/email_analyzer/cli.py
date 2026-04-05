@@ -197,7 +197,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         config = OllamaBatchSubmitConfig(
             batch_jsonl=args.batch_jsonl,
             output_dir=args.output_dir,
-            base_url=base_urls[0] if len(base_urls) == 1 else None,
             base_urls=base_urls,
             model=args.model,
             prompt=args.prompt,

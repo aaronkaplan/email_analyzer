@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .batch_submitter_common import write_text_atomic
 from .config import (
     DEFAULT_OPENAI_INSTRUCTIONS,
     OPENAI_BATCH_ENDPOINT,
@@ -190,16 +191,9 @@ def _write_shards(config: RenderBatchConfig, shards: list[list[str]]) -> None:
 
     for index, shard in enumerate(shards, start=1):
         target = config.batch_dir / f"batch-{index:05d}.jsonl"
-        _write_text_atomic(target, "\n".join(shard) + ("\n" if shard else ""))
+        write_text_atomic(target, "\n".join(shard) + ("\n" if shard else ""))
 
     if len(shards) == 1:
-        _write_text_atomic(
+        write_text_atomic(
             batch_alias, "\n".join(shards[0]) + ("\n" if shards[0] else "")
         )
-
-
-def _write_text_atomic(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_name(f".{path.name}.tmp")
-    temp_path.write_text(content, encoding="utf-8")
-    temp_path.replace(path)

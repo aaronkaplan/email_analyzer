@@ -6,11 +6,11 @@ from pathlib import Path
 
 from rich.console import Console
 
-from email_analyzer.batch_submitter import (
-    _compute_stage_durations,
-    _format_status_line,
-    _load_and_validate_batch,
-    run_batch_submitter,
+from email_analyzer.batch_submitter import run_batch_submitter
+from email_analyzer.batch_submitter_common import (
+    compute_stage_durations,
+    format_status_line,
+    load_and_validate_batch,
 )
 from email_analyzer.config import BatchSubmitConfig
 
@@ -20,13 +20,37 @@ class RecordingReporter:
         self.events: list[tuple[str, str, int, int, int]] = []
 
     def start(self, snapshot) -> None:
-        self.events.append(("start", snapshot.status, snapshot.total_requests, snapshot.completed_requests, snapshot.failed_requests))
+        self.events.append(
+            (
+                "start",
+                snapshot.status,
+                snapshot.total_requests,
+                snapshot.completed_requests,
+                snapshot.failed_requests,
+            )
+        )
 
     def update(self, snapshot) -> None:
-        self.events.append(("update", snapshot.status, snapshot.total_requests, snapshot.completed_requests, snapshot.failed_requests))
+        self.events.append(
+            (
+                "update",
+                snapshot.status,
+                snapshot.total_requests,
+                snapshot.completed_requests,
+                snapshot.failed_requests,
+            )
+        )
 
     def stop(self, snapshot) -> None:
-        self.events.append(("stop", snapshot.status, snapshot.total_requests, snapshot.completed_requests, snapshot.failed_requests))
+        self.events.append(
+            (
+                "stop",
+                snapshot.status,
+                snapshot.total_requests,
+                snapshot.completed_requests,
+                snapshot.failed_requests,
+            )
+        )
 
 
 class FakeFileResponse:
@@ -79,7 +103,9 @@ class FakeBatchesAPI:
 
 
 class FakeOpenAIClient:
-    def __init__(self, states: list[dict[str, object]], output_text: str, error_text: str) -> None:
+    def __init__(
+        self, states: list[dict[str, object]], output_text: str, error_text: str
+    ) -> None:
         self.files = FakeFilesAPI(output_text=output_text, error_text=error_text)
         self.batches = FakeBatchesAPI(states)
 
@@ -93,19 +119,24 @@ def test_load_and_validate_batch_rejects_duplicate_custom_id(tmp_path: Path) -> 
         "body": {"model": "gpt-4o-mini", "instructions": "x", "input": []},
     }
     batch_jsonl.write_text(
-        json.dumps(line, sort_keys=True) + "\n" + json.dumps(line, sort_keys=True) + "\n",
+        json.dumps(line, sort_keys=True)
+        + "\n"
+        + json.dumps(line, sort_keys=True)
+        + "\n",
         encoding="utf-8",
     )
 
     try:
-        _load_and_validate_batch(batch_jsonl)
+        load_and_validate_batch(batch_jsonl)
     except ValueError as exc:
         assert "Duplicate custom_id" in str(exc)
     else:
         raise AssertionError("expected duplicate custom_id validation error")
 
 
-def test_load_and_validate_batch_handles_unicode_line_separator_in_string(tmp_path: Path) -> None:
+def test_load_and_validate_batch_handles_unicode_line_separator_in_string(
+    tmp_path: Path,
+) -> None:
     batch_jsonl = tmp_path / "batch.jsonl"
     line = {
         "custom_id": "unicode-separator.eml",
@@ -124,16 +155,20 @@ def test_load_and_validate_batch_handles_unicode_line_separator_in_string(tmp_pa
             ],
         },
     }
-    batch_jsonl.write_text(json.dumps(line, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    batch_jsonl.write_text(
+        json.dumps(line, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
-    requests, validation = _load_and_validate_batch(batch_jsonl)
+    requests, validation = load_and_validate_batch(batch_jsonl)
 
     assert validation.total_requests == 1
     assert validation.model == "gpt-4o-mini"
     assert requests[0]["custom_id"] == "unicode-separator.eml"
 
 
-def test_run_batch_submitter_rewrites_prompt_and_downloads_outputs(tmp_path: Path) -> None:
+def test_run_batch_submitter_rewrites_prompt_and_downloads_outputs(
+    tmp_path: Path,
+) -> None:
     batch_jsonl = tmp_path / "batch-00001.jsonl"
     batch_jsonl.write_text(
         "\n".join(
@@ -146,7 +181,12 @@ def test_run_batch_submitter_rewrites_prompt_and_downloads_outputs(tmp_path: Pat
                         "body": {
                             "model": "gpt-4o-mini",
                             "instructions": "old prompt",
-                            "input": [{"role": "user", "content": [{"type": "input_text", "text": "{}"}]}],
+                            "input": [
+                                {
+                                    "role": "user",
+                                    "content": [{"type": "input_text", "text": "{}"}],
+                                }
+                            ],
                         },
                     },
                     sort_keys=True,
@@ -159,7 +199,12 @@ def test_run_batch_submitter_rewrites_prompt_and_downloads_outputs(tmp_path: Pat
                         "body": {
                             "model": "gpt-4o-mini",
                             "instructions": "old prompt",
-                            "input": [{"role": "user", "content": [{"type": "input_text", "text": "{}"}]}],
+                            "input": [
+                                {
+                                    "role": "user",
+                                    "content": [{"type": "input_text", "text": "{}"}],
+                                }
+                            ],
                         },
                     },
                     sort_keys=True,
@@ -228,7 +273,11 @@ def test_run_batch_submitter_rewrites_prompt_and_downloads_outputs(tmp_path: Pat
     )
 
     assert exit_code == 0
-    rewritten_lines = [json.loads(line) for line in batch_jsonl.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rewritten_lines = [
+        json.loads(line)
+        for line in batch_jsonl.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     assert all(line["body"]["instructions"] == "new prompt" for line in rewritten_lines)
 
     output_dir = tmp_path / "batch_output" / "batch-00001"
@@ -237,7 +286,9 @@ def test_run_batch_submitter_rewrites_prompt_and_downloads_outputs(tmp_path: Pat
     assert (output_dir / "batch_output.jsonl").exists()
     assert (output_dir / "batch_errors.jsonl").exists()
 
-    summary = json.loads((output_dir / "batch_summary.json").read_text(encoding="utf-8"))
+    summary = json.loads(
+        (output_dir / "batch_summary.json").read_text(encoding="utf-8")
+    )
     assert summary["status"] == "completed"
     assert summary["successful_processed_mails"] == 2
     assert summary["failed_mails"] == 0
@@ -247,7 +298,11 @@ def test_run_batch_submitter_rewrites_prompt_and_downloads_outputs(tmp_path: Pat
     assert summary["stage_durations_seconds"]["in_progress"] == 5.0
     assert summary["stage_durations_seconds"]["finalizing"] == 2.0
 
-    history_lines = (output_dir / "batch_status_history.jsonl").read_text(encoding="utf-8").splitlines()
+    history_lines = (
+        (output_dir / "batch_status_history.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
     assert len(history_lines) == 3
     assert reporter.events[0][:2] == ("start", "validating")
     assert reporter.events[-1][:2] == ("stop", "completed")
@@ -265,7 +320,12 @@ def test_run_batch_submitter_no_wait_submits_and_exits_early(tmp_path: Path) -> 
                 "body": {
                     "model": "gpt-4o-mini",
                     "instructions": "prompt",
-                    "input": [{"role": "user", "content": [{"type": "input_text", "text": "{}"}]}],
+                    "input": [
+                        {
+                            "role": "user",
+                            "content": [{"type": "input_text", "text": "{}"}],
+                        }
+                    ],
                 },
             },
             sort_keys=True,
@@ -307,14 +367,18 @@ def test_run_batch_submitter_no_wait_submits_and_exits_early(tmp_path: Path) -> 
     ]
 
     output_dir = tmp_path / "batch_output" / "batch-00001"
-    summary = json.loads((output_dir / "batch_summary.json").read_text(encoding="utf-8"))
+    summary = json.loads(
+        (output_dir / "batch_summary.json").read_text(encoding="utf-8")
+    )
     assert summary["waiting_mode"] == "submitted"
     assert summary["status"] == "validating"
     assert summary["poll_count"] == 1
     assert not (output_dir / "batch_output.jsonl").exists()
 
 
-def test_run_batch_submitter_resume_batch_id_polls_existing_batch(tmp_path: Path) -> None:
+def test_run_batch_submitter_resume_batch_id_polls_existing_batch(
+    tmp_path: Path,
+) -> None:
     client = FakeOpenAIClient(
         states=[
             {
@@ -366,15 +430,24 @@ def test_run_batch_submitter_resume_batch_id_polls_existing_batch(tmp_path: Path
     assert reporter.events[0][:2] == ("start", "in_progress")
     assert reporter.events[-1][:2] == ("stop", "completed")
 
-    summary = json.loads((output_dir / "batch_summary.json").read_text(encoding="utf-8"))
+    summary = json.loads(
+        (output_dir / "batch_summary.json").read_text(encoding="utf-8")
+    )
     assert summary["batch_id"] == "batch_resume_123"
     assert summary["waiting_mode"] == "completed"
     assert summary["output_line_count"] == 3
     assert summary["successful_processed_mails"] == 3
-    assert json.loads((output_dir / "submission.json").read_text(encoding="utf-8"))["resume_mode"] is True
+    assert (
+        json.loads((output_dir / "submission.json").read_text(encoding="utf-8"))[
+            "resume_mode"
+        ]
+        is True
+    )
 
 
-def test_run_batch_submitter_rejects_prompt_override_with_resume(tmp_path: Path) -> None:
+def test_run_batch_submitter_rejects_prompt_override_with_resume(
+    tmp_path: Path,
+) -> None:
     console_stream = StringIO()
     exit_code = run_batch_submitter(
         BatchSubmitConfig(
@@ -391,7 +464,7 @@ def test_run_batch_submitter_rejects_prompt_override_with_resume(tmp_path: Path)
 
 
 def test_compute_stage_durations_handles_expired_batch() -> None:
-    durations = _compute_stage_durations(
+    durations = compute_stage_durations(
         {
             "created_at": 10,
             "in_progress_at": 14,
@@ -405,9 +478,9 @@ def test_compute_stage_durations_handles_expired_batch() -> None:
 
 
 def test_format_status_line_includes_progress_fields() -> None:
-    from email_analyzer.batch_submitter import BatchDisplaySnapshot
+    from email_analyzer.batch_submitter_common import BatchDisplaySnapshot
 
-    line = _format_status_line(
+    line = format_status_line(
         BatchDisplaySnapshot(
             batch_id="batch_abcdefgh",
             status="in_progress",

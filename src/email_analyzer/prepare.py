@@ -24,6 +24,7 @@ from .logging_utils import (
     start_logging,
     stop_logging,
 )
+from .batch_submitter_common import write_json_atomic
 from .metrics import (
     aggregate_step_metrics,
     estimate_token_count,
@@ -391,7 +392,7 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
             "total_duration_ms": total_ms,
             "traceback": traceback.format_exc(),
         }
-        _write_json_atomic(error_path, error_payload)
+        write_json_atomic(error_path, error_payload)
         log_event(
             logger,
             "Failed to process email",
@@ -623,14 +624,4 @@ def _build_processed_email(
 
 
 def _write_processed_email(output_path: Path, processed_email: ProcessedEmail) -> None:
-    _write_json_atomic(output_path, processed_email.to_dict())
-
-
-def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = path.with_name(f".{path.name}.tmp")
-    temporary_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    temporary_path.replace(path)
+    write_json_atomic(output_path, processed_email.to_dict())

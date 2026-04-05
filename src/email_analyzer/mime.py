@@ -53,7 +53,10 @@ def is_textual_part(part: PartAnalysis) -> bool:
         return True
     if part.content_type.startswith("text/"):
         return True
-    if part.filename and Path(part.filename).suffix.lower() in DEFAULT_TEXT_ATTACHMENT_EXTENSIONS:
+    if (
+        part.filename
+        and Path(part.filename).suffix.lower() in DEFAULT_TEXT_ATTACHMENT_EXTENSIONS
+    ):
         return True
     return False
 
@@ -64,7 +67,9 @@ def normalized_text_hash(text: str | None) -> str | None:
     return sha256(text.encode("utf-8")).hexdigest()
 
 
-def _walk_message(message: Message, path: str, parent_content_types: list[str]) -> Iterable[PartAnalysis]:
+def _walk_message(
+    message: Message, path: str, parent_content_types: list[str]
+) -> Iterable[PartAnalysis]:
     content_type = message.get_content_type()
     disposition = message.get_content_disposition()
     filename = message.get_filename()
@@ -87,7 +92,9 @@ def _walk_message(message: Message, path: str, parent_content_types: list[str]) 
         next_parents = [*parent_content_types, content_type]
         email_message = cast(EmailMessage, message)
         for index, child in enumerate(email_message.iter_parts(), start=1):
-            yield from _walk_message(cast(Message, child), f"{path}.{index}", next_parents)
+            yield from _walk_message(
+                cast(Message, child), f"{path}.{index}", next_parents
+            )
 
 
 def _classify_part(message: Message, parent_content_types: list[str]) -> str:
@@ -104,7 +111,10 @@ def _classify_part(message: Message, parent_content_types: list[str]) -> str:
         return "attached_message"
 
     if filename or disposition == "attachment":
-        if content_type.startswith("text/") or extension in DEFAULT_TEXT_ATTACHMENT_EXTENSIONS:
+        if (
+            content_type.startswith("text/")
+            or extension in DEFAULT_TEXT_ATTACHMENT_EXTENSIONS
+        ):
             return "text_attachment"
         return "attachment"
 
@@ -134,13 +144,13 @@ def _decode_part(part: PartAnalysis) -> None:
         else:
             payload = b""
 
-    part.decoded_bytes = payload
     part.decoded_byte_size = len(payload)
 
     if part.content_type == "message/rfc822":
-        preview = _extract_embedded_message_preview(cast(EmailMessage, part.message_part))
+        preview = _extract_embedded_message_preview(
+            cast(EmailMessage, part.message_part)
+        )
         if preview:
-            part.decoded_text = preview
             part.visible_text = normalize_visible_text(preview)
             part.normalized_text = normalize_for_dedupe(preview)
             part.extraction_method = "nested_message_preview"
@@ -150,7 +160,6 @@ def _decode_part(part: PartAnalysis) -> None:
         return
 
     decoded_text, charset_used, charset_source = _decode_bytes(payload, part.charset)
-    part.decoded_text = decoded_text
     part.charset_used = charset_used
     part.charset_source = charset_source
 
@@ -164,7 +173,9 @@ def _decode_part(part: PartAnalysis) -> None:
     part.normalized_text = normalize_for_dedupe(part.visible_text)
 
 
-def _decode_bytes(payload: bytes, declared_charset: str | None) -> tuple[str, str | None, str | None]:
+def _decode_bytes(
+    payload: bytes, declared_charset: str | None
+) -> tuple[str, str | None, str | None]:
     if not payload:
         return "", declared_charset, "empty"
 
@@ -196,11 +207,19 @@ def _decode_bytes(payload: bytes, declared_charset: str | None) -> tuple[str, st
                 try:
                     output_bytes = output()
                     if isinstance(output_bytes, bytes):
-                        return output_bytes.decode("utf-8", errors="replace"), getattr(match, "encoding", None), "charset-normalizer"
+                        return (
+                            output_bytes.decode("utf-8", errors="replace"),
+                            getattr(match, "encoding", None),
+                            "charset-normalizer",
+                        )
                 except Exception:
                     pass
 
-    return payload.decode("utf-8", errors="replace"), declared_charset or "utf-8", "replacement"
+    return (
+        payload.decode("utf-8", errors="replace"),
+        declared_charset or "utf-8",
+        "replacement",
+    )
 
 
 def _extract_embedded_message_preview(part: EmailMessage) -> str | None:

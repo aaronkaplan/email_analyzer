@@ -23,3 +23,4 @@ benchmarks/*
 
 .ruff_cache/*
 docs/batch_submission.md
+docs/sessionlog.md

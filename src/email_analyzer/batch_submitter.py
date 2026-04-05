@@ -12,15 +12,13 @@ from openai import OpenAI
 from rich.console import Console
 
 from .batch_submitter_common import (
-    BatchDisplaySnapshot,
     RichBatchStatusReporter,
     StatusReporter,
     append_status_history,
     build_display_snapshot,
     build_summary,
-    compute_stage_durations,
+    count_jsonl_lines,
     exit_code_for_summary,
-    format_duration,
     load_and_validate_batch,
     normalize_request_counts,
     print_summary,
@@ -32,19 +30,6 @@ from .batch_submitter_common import (
 from .config import BatchSubmitConfig, OPENAI_BATCH_ENDPOINT
 
 TERMINAL_BATCH_STATES = {"completed", "failed", "expired", "cancelled"}
-
-_compute_stage_durations = compute_stage_durations
-_load_and_validate_batch = load_and_validate_batch
-
-
-def _format_status_line(snapshot: BatchDisplaySnapshot) -> str:
-    return (
-        f"[{format_duration(snapshot.elapsed_seconds)}] {snapshot.status:<11} {snapshot.batch_id[-8:]} "
-        f"processed {snapshot.processed_requests}/{snapshot.total_requests} "
-        f"{snapshot.percent_complete:5.1f}% ok {snapshot.completed_requests} "
-        f"failed {snapshot.failed_requests} remaining {snapshot.remaining_requests} "
-        f"state_elapsed {format_duration(snapshot.state_elapsed_seconds)}"
-    )
 
 
 def run_batch_submitter(
@@ -377,7 +362,7 @@ def _download_batch_file(client: Any, file_id: str | None, target_path: Path) ->
     content = _content_to_bytes(client.files.content(file_id))
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_bytes(content)
-    return _count_jsonl_lines(target_path)
+    return count_jsonl_lines(target_path)
 
 
 def _content_to_bytes(content: Any) -> bytes:
@@ -411,17 +396,6 @@ def _content_to_bytes(content: Any) -> bytes:
     raise TypeError("Unsupported file content response type")
 
 
-def _count_jsonl_lines(path: Path) -> int:
-    return sum(1 for line in _read_jsonl_lines(path) if line.strip())
-
-
-def _read_jsonl_lines(path: Path) -> list[str]:
-    lines = path.read_text(encoding="utf-8").split("\n")
-    if lines and lines[-1] == "":
-        lines.pop()
-    return [line.rstrip("\r") for line in lines]
-
-
 def _api_model_to_dict(model: Any) -> dict[str, Any]:
     if hasattr(model, "model_dump"):
         dumped = model.model_dump()
@@ -430,21 +404,3 @@ def _api_model_to_dict(model: Any) -> dict[str, Any]:
     if isinstance(model, dict):
         return model
     raise TypeError(f"Unsupported OpenAI response type: {type(model)!r}")
-
-
-def _normalize_request_counts(counts: Any) -> dict[str, int]:
-    if hasattr(counts, "model_dump"):
-        counts = counts.model_dump()
-    if not isinstance(counts, dict):
-        return {"total": 0, "completed": 0, "failed": 0}
-    return {
-        "total": int(counts.get("total") or 0),
-        "completed": int(counts.get("completed") or 0),
-        "failed": int(counts.get("failed") or 0),
-    }
-
-
-def _as_timestamp(value: Any) -> float | None:
-    if value is None:
-        return None
-    return float(value)

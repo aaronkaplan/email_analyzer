@@ -62,7 +62,6 @@ class PrepareConfig:
     output_dir: Path
     logs_dir: Path
     workers: int
-    use_ripmime_fallback: bool = True
 
 
 @dataclass(slots=True)
@@ -99,7 +98,6 @@ class BatchSubmitConfig:
 class OllamaBatchSubmitConfig:
     batch_jsonl: Path
     output_dir: Path | None = None
-    base_url: str | None = None
     base_urls: tuple[str, ...] = ()
     model: str | None = None
     prompt: str | None = None

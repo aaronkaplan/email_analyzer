@@ -57,8 +57,7 @@ class RichBatchStatusReporter:
         self._task_id: TaskID | None = None
 
     def start(self, snapshot: BatchDisplaySnapshot) -> None:
-        if not self._live:
-            self.console.print(_format_status_line(snapshot))
+        if self._print_static_snapshot(snapshot):
             return
 
         progress = Progress(
@@ -78,42 +77,27 @@ class RichBatchStatusReporter:
         )
         progress.start()
         self._progress = progress
-        self._task_id = progress.add_task(
-            "batch",
-            total=max(1, snapshot.total_requests),
-            completed=snapshot.processed_requests,
-            status=snapshot.status,
-            batch_suffix=snapshot.batch_id[-8:],
-            ok=snapshot.completed_requests,
-            failed=snapshot.failed_requests,
-            remaining=snapshot.remaining_requests,
-            state_elapsed=format_duration(snapshot.state_elapsed_seconds),
-        )
+        self._task_id = progress.add_task("batch", **_progress_fields(snapshot))
 
     def update(self, snapshot: BatchDisplaySnapshot) -> None:
-        if not self._live:
-            self.console.print(_format_status_line(snapshot))
+        if self._print_static_snapshot(snapshot):
             return
 
         if self._progress is None or self._task_id is None:
             return
 
-        self._progress.update(
-            self._task_id,
-            total=max(1, snapshot.total_requests),
-            completed=snapshot.processed_requests,
-            status=snapshot.status,
-            batch_suffix=snapshot.batch_id[-8:],
-            ok=snapshot.completed_requests,
-            failed=snapshot.failed_requests,
-            remaining=snapshot.remaining_requests,
-            state_elapsed=format_duration(snapshot.state_elapsed_seconds),
-        )
+        self._progress.update(self._task_id, **_progress_fields(snapshot))
 
     def stop(self, snapshot: BatchDisplaySnapshot) -> None:
         if self._progress is not None:
             self._progress.stop()
-        self.console.print(_format_status_line(snapshot))
+        self.console.print(format_status_line(snapshot))
+
+    def _print_static_snapshot(self, snapshot: BatchDisplaySnapshot) -> bool:
+        if self._live:
+            return False
+        self.console.print(format_status_line(snapshot))
+        return True
 
 
 def resolve_prompt_override(
@@ -189,27 +173,6 @@ def load_and_validate_batch(
     return requests, BatchValidationResult(
         total_requests=len(requests), model=model or ""
     )
-
-
-def rewrite_batch_lines(
-    requests: list[dict[str, Any]],
-    *,
-    prompt: str | None = None,
-    model: str | None = None,
-) -> list[str]:
-    rewritten_lines: list[str] = []
-    for request in requests:
-        request_body = dict(request["body"])
-        if prompt is not None:
-            request_body["instructions"] = prompt
-        if model is not None:
-            request_body["model"] = model
-        rewritten_request = dict(request)
-        rewritten_request["body"] = request_body
-        rewritten_lines.append(
-            json.dumps(rewritten_request, ensure_ascii=True, sort_keys=True)
-        )
-    return rewritten_lines
 
 
 def build_display_snapshot(
@@ -486,7 +449,7 @@ def format_duration(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
-def _format_status_line(snapshot: BatchDisplaySnapshot) -> str:
+def format_status_line(snapshot: BatchDisplaySnapshot) -> str:
     return (
         f"[{format_duration(snapshot.elapsed_seconds)}] {snapshot.status:<11} {snapshot.batch_id[-8:]} "
         f"processed {snapshot.processed_requests}/{snapshot.total_requests} "
@@ -494,3 +457,16 @@ def _format_status_line(snapshot: BatchDisplaySnapshot) -> str:
         f"failed {snapshot.failed_requests} remaining {snapshot.remaining_requests} "
         f"state_elapsed {format_duration(snapshot.state_elapsed_seconds)}"
     )
+
+
+def _progress_fields(snapshot: BatchDisplaySnapshot) -> dict[str, int | str]:
+    return {
+        "total": max(1, snapshot.total_requests),
+        "completed": snapshot.processed_requests,
+        "status": snapshot.status,
+        "batch_suffix": snapshot.batch_id[-8:],
+        "ok": snapshot.completed_requests,
+        "failed": snapshot.failed_requests,
+        "remaining": snapshot.remaining_requests,
+        "state_elapsed": format_duration(snapshot.state_elapsed_seconds),
+    }

@@ -86,7 +86,8 @@ def run_ollama_batch_submitter(
 
     try:
         _validate_submit_config(config)
-        base_url = _resolve_base_url(config)
+        base_urls = _resolve_base_urls(config)
+        base_url = base_urls[0]
         source_requests, validation = load_and_validate_batch(config.batch_jsonl)
         provider_model = _resolve_model(config)
         prompt_text, prompt_source, prompt_source_path = resolve_prompt_override(
@@ -120,7 +121,23 @@ def run_ollama_batch_submitter(
         )
         write_text_atomic(submitted_copy_path, "\n".join(submitted_lines) + "\n")
 
-        batch_ids = _make_local_ids(submitted_lines, base_url, provider_model)
+        batch_ids = _make_local_ids(submitted_lines, base_urls, provider_model)
+        provider_meta: dict[str, Any] = {
+            "provider": "ollama",
+            "provider_endpoint": OLLAMA_CHAT_ENDPOINT,
+            "base_url": base_url,
+            "source_model": validation.model,
+        }
+        if len(base_urls) > 1:
+            provider_meta.update(
+                {
+                    "base_urls": list(base_urls),
+                    "num_shards": len(base_urls),
+                    "per_shard_num_parallel_jobs": config.num_parallel_jobs,
+                    "total_possible_parallel_requests": len(base_urls)
+                    * config.num_parallel_jobs,
+                }
+            )
         submission_record.update(
             {
                 "submitted_batch_jsonl": str(submitted_copy_path),
@@ -134,15 +151,15 @@ def run_ollama_batch_submitter(
                 "batch_created_at": utcnow_iso(),
             }
         )
-        submission_record["provider_meta"] = {
-            "provider": "ollama",
-            "provider_endpoint": OLLAMA_CHAT_ENDPOINT,
-            "base_url": base_url,
-            "source_model": validation.model,
-        }
+        submission_record["provider_meta"] = provider_meta
         write_json_atomic(submission_path, submission_record)
 
-        batch = _build_initial_batch(batch_ids, base_url=base_url, model=provider_model)
+        batch = _build_initial_batch(
+            batch_ids,
+            base_urls=base_urls,
+            model=provider_model,
+            num_parallel_jobs=config.num_parallel_jobs,
+        )
         reporter_obj = reporter or RichBatchStatusReporter(console_obj)
         executor_fn = request_executor or _execute_ollama_chat_request
         total_requests = len(prepared_requests)
@@ -150,16 +167,17 @@ def run_ollama_batch_submitter(
 
         start_monotonic = time.monotonic()
         state_started_monotonic = start_monotonic
-        snapshot = build_display_snapshot(
-            batch,
-            total_requests,
-            start_monotonic,
-            state_started_monotonic,
-            start_monotonic,
+        _, progress_event_count = _report_status(
+            batch=batch,
+            total_requests=total_requests,
+            started_monotonic=start_monotonic,
+            state_started_monotonic=state_started_monotonic,
+            now_monotonic=start_monotonic,
+            reporter=reporter_obj,
+            history_path=history_path,
+            mode="start",
+            progress_event_count=progress_event_count,
         )
-        reporter_obj.start(snapshot)
-        append_status_history(history_path, batch, snapshot)
-        progress_event_count += 1
 
         batch["status"] = "in_progress"
         batch["in_progress_at"] = time.time()
@@ -169,26 +187,30 @@ def run_ollama_batch_submitter(
             "failed": 0,
         }
         state_started_monotonic = time.monotonic()
-        snapshot = build_display_snapshot(
-            batch,
-            total_requests,
-            start_monotonic,
-            state_started_monotonic,
-            state_started_monotonic,
+        _, progress_event_count = _report_status(
+            batch=batch,
+            total_requests=total_requests,
+            started_monotonic=start_monotonic,
+            state_started_monotonic=state_started_monotonic,
+            now_monotonic=state_started_monotonic,
+            reporter=reporter_obj,
+            history_path=history_path,
+            mode="update",
+            progress_event_count=progress_event_count,
         )
-        reporter_obj.update(snapshot)
-        append_status_history(history_path, batch, snapshot)
-        progress_event_count += 1
 
         results: list[OllamaExecutionResult | None] = [None] * total_requests
         batch_errors: list[dict[str, Any]] = []
 
-        with ThreadPoolExecutor(max_workers=config.num_parallel_jobs) as pool:
+        with _ShardedExecutorPool(
+            base_urls=base_urls,
+            num_parallel_jobs=config.num_parallel_jobs,
+        ) as pools:
             future_map = {
-                pool.submit(
+                pools.submit(
                     _run_single_request,
                     prepared,
-                    base_url=base_url,
+                    base_url=base_urls[prepared.index % len(base_urls)],
                     request_timeout_seconds=config.request_timeout_seconds,
                     request_executor=executor_fn,
                 ): prepared.index
@@ -217,30 +239,32 @@ def run_ollama_batch_submitter(
                     )
 
                 now_monotonic = time.monotonic()
-                snapshot = build_display_snapshot(
-                    batch,
-                    total_requests,
-                    start_monotonic,
-                    state_started_monotonic,
-                    now_monotonic,
+                _, progress_event_count = _report_status(
+                    batch=batch,
+                    total_requests=total_requests,
+                    started_monotonic=start_monotonic,
+                    state_started_monotonic=state_started_monotonic,
+                    now_monotonic=now_monotonic,
+                    reporter=reporter_obj,
+                    history_path=history_path,
+                    mode="update",
+                    progress_event_count=progress_event_count,
                 )
-                reporter_obj.update(snapshot)
-                append_status_history(history_path, batch, snapshot)
-                progress_event_count += 1
 
         batch["status"] = "finalizing"
         batch["finalizing_at"] = time.time()
         state_started_monotonic = time.monotonic()
-        snapshot = build_display_snapshot(
-            batch,
-            total_requests,
-            start_monotonic,
-            state_started_monotonic,
-            state_started_monotonic,
+        _, progress_event_count = _report_status(
+            batch=batch,
+            total_requests=total_requests,
+            started_monotonic=start_monotonic,
+            state_started_monotonic=state_started_monotonic,
+            now_monotonic=state_started_monotonic,
+            reporter=reporter_obj,
+            history_path=history_path,
+            mode="update",
+            progress_event_count=progress_event_count,
         )
-        reporter_obj.update(snapshot)
-        append_status_history(history_path, batch, snapshot)
-        progress_event_count += 1
 
         success_lines = _render_jsonl_lines(
             [
@@ -273,16 +297,17 @@ def run_ollama_batch_submitter(
         write_json_atomic(batch_final_path, batch)
 
         completed_monotonic = time.monotonic()
-        snapshot = build_display_snapshot(
-            batch,
-            total_requests,
-            start_monotonic,
-            state_started_monotonic,
-            completed_monotonic,
+        _, progress_event_count = _report_status(
+            batch=batch,
+            total_requests=total_requests,
+            started_monotonic=start_monotonic,
+            state_started_monotonic=state_started_monotonic,
+            now_monotonic=completed_monotonic,
+            reporter=reporter_obj,
+            history_path=history_path,
+            mode="stop",
+            progress_event_count=progress_event_count,
         )
-        append_status_history(history_path, batch, snapshot)
-        progress_event_count += 1
-        reporter_obj.stop(snapshot)
 
         summary = build_summary(
             source_batch_jsonl=config.batch_jsonl,
@@ -298,13 +323,14 @@ def run_ollama_batch_submitter(
                 "provider_meta": {
                     "provider": "ollama",
                     "provider_endpoint": OLLAMA_CHAT_ENDPOINT,
-                    "base_url": (submission_record.get("provider_meta") or {}).get(
-                        "base_url"
-                    ),
+                    "base_url": base_url,
+                    "base_urls": list(base_urls) if len(base_urls) > 1 else None,
+                    "num_shards": len(base_urls),
+                    "per_shard_num_parallel_jobs": config.num_parallel_jobs,
+                    "total_possible_parallel_requests": len(base_urls)
+                    * config.num_parallel_jobs,
                     "provider_model": submission_record.get("model"),
-                    "source_model": (submission_record.get("provider_meta") or {}).get(
-                        "source_model"
-                    ),
+                    "source_model": validation.model,
                 }
             },
         )
@@ -330,6 +356,12 @@ def _validate_submit_config(config: OllamaBatchSubmitConfig) -> None:
         raise ValueError("--num-parallel-jobs must be at least 1")
     if config.request_timeout_seconds < 1:
         raise ValueError("--request-timeout-seconds must be at least 1")
+    if (
+        config.num_shards is not None
+        and len(config.base_urls) > 0
+        and config.num_shards != len(config.base_urls)
+    ):
+        raise ValueError("--num-shards must equal the number of --base-url values")
 
 
 def _resolve_output_dir(config: OllamaBatchSubmitConfig) -> Path:
@@ -344,11 +376,20 @@ def _resolve_output_dir(config: OllamaBatchSubmitConfig) -> Path:
     return config.batch_jsonl.parent / "ollama_batch_output" / config.batch_jsonl.stem
 
 
-def _resolve_base_url(config: OllamaBatchSubmitConfig) -> str:
-    value = config.base_url or os.environ.get("OLLAMA_BASE_URL")
-    if not value:
-        raise RuntimeError("OLLAMA_BASE_URL is not set and --base-url was not provided")
-    return value.rstrip("/")
+def _resolve_base_urls(config: OllamaBatchSubmitConfig) -> tuple[str, ...]:
+    if config.base_urls:
+        values = tuple(base_url.rstrip("/") for base_url in config.base_urls)
+    else:
+        env_value = os.environ.get("OLLAMA_BASE_URL")
+        if not env_value:
+            raise RuntimeError(
+                "OLLAMA_BASE_URL is not set and --base-url was not provided"
+            )
+        values = (env_value.rstrip("/"),)
+
+    if config.num_shards is not None and config.num_shards != len(values):
+        raise ValueError("--num-shards must equal the number of --base-url values")
+    return values
 
 
 def _resolve_model(config: OllamaBatchSubmitConfig) -> str:
@@ -610,6 +651,53 @@ def _execute_ollama_chat_request(
     return parsed
 
 
+class _ShardedExecutorPool:
+    def __init__(self, *, base_urls: tuple[str, ...], num_parallel_jobs: int) -> None:
+        self._pools = {
+            base_url: ThreadPoolExecutor(max_workers=num_parallel_jobs)
+            for base_url in base_urls
+        }
+
+    def __enter__(self) -> _ShardedExecutorPool:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        for pool in self._pools.values():
+            pool.shutdown(wait=True)
+
+    def submit(self, fn, *args, base_url: str, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        return self._pools[base_url].submit(fn, *args, base_url=base_url, **kwargs)
+
+
+def _report_status(
+    *,
+    batch: dict[str, Any],
+    total_requests: int,
+    started_monotonic: float,
+    state_started_monotonic: float,
+    now_monotonic: float,
+    reporter: StatusReporter,
+    history_path: Path,
+    mode: str,
+    progress_event_count: int,
+) -> tuple[Any, int]:
+    snapshot = build_display_snapshot(
+        batch,
+        total_requests,
+        started_monotonic,
+        state_started_monotonic,
+        now_monotonic,
+    )
+    if mode == "start":
+        reporter.start(snapshot)
+    elif mode == "stop":
+        reporter.stop(snapshot)
+    else:
+        reporter.update(snapshot)
+    append_status_history(history_path, batch, snapshot)
+    return snapshot, progress_event_count + 1
+
+
 def _extract_output_text(raw_response: dict[str, Any]) -> str:
     message = raw_response.get("message")
     if not isinstance(message, dict):
@@ -723,8 +811,27 @@ def _build_usage(raw_response: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_initial_batch(
-    batch_ids: dict[str, str], *, base_url: str, model: str
+    batch_ids: dict[str, str],
+    *,
+    base_urls: tuple[str, ...],
+    model: str,
+    num_parallel_jobs: int,
 ) -> dict[str, Any]:
+    provider_meta: dict[str, Any] = {
+        "provider": "ollama",
+        "provider_endpoint": OLLAMA_CHAT_ENDPOINT,
+        "base_url": base_urls[0],
+        "model": model,
+    }
+    if len(base_urls) > 1:
+        provider_meta.update(
+            {
+                "base_urls": list(base_urls),
+                "num_shards": len(base_urls),
+                "per_shard_num_parallel_jobs": num_parallel_jobs,
+                "total_possible_parallel_requests": len(base_urls) * num_parallel_jobs,
+            }
+        )
     return {
         "id": batch_ids["batch_id"],
         "status": "validating",
@@ -735,19 +842,14 @@ def _build_initial_batch(
         "created_at": time.time(),
         "request_counts": {"total": 0, "completed": 0, "failed": 0},
         "errors": None,
-        "provider_meta": {
-            "provider": "ollama",
-            "provider_endpoint": OLLAMA_CHAT_ENDPOINT,
-            "base_url": base_url,
-            "model": model,
-        },
+        "provider_meta": provider_meta,
     }
 
 
 def _make_local_ids(
-    submitted_lines: list[str], base_url: str, provider_model: str
+    submitted_lines: list[str], base_urls: tuple[str, ...], provider_model: str
 ) -> dict[str, str]:
-    seed = "\n".join(submitted_lines) + f"\n{base_url}\n{provider_model}"
+    seed = "\n".join(submitted_lines) + f"\n{'\n'.join(base_urls)}\n{provider_model}"
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
     return {
         "batch_id": f"ollama_batch_{digest[:16]}",

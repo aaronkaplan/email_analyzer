@@ -22,7 +22,9 @@ class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         event = dict(getattr(record, "event", {}))
         payload = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(
+                record.created, tz=timezone.utc
+            ).isoformat(),
             "level": record.levelname.lower(),
             "logger": record.name,
             "message": record.getMessage(),
@@ -50,7 +52,9 @@ def start_logging(logs_dir: Path) -> LoggingRuntime:
     manager = multiprocessing.Manager()
     queue = manager.Queue(-1)
 
-    pipeline_handler = logging.FileHandler(logs_dir / "pipeline.jsonl", mode="w", encoding="utf-8")
+    pipeline_handler = logging.FileHandler(
+        logs_dir / "pipeline.jsonl", mode="w", encoding="utf-8"
+    )
     pipeline_handler.setFormatter(JsonFormatter())
 
     console_handler = logging.StreamHandler()
@@ -58,7 +62,7 @@ def start_logging(logs_dir: Path) -> LoggingRuntime:
 
     listener = QueueListener(queue, pipeline_handler, console_handler)
     listener.start()
-    configure_main_logging(queue)
+    _configure_main_logging(queue)
 
     return LoggingRuntime(
         manager=manager,
@@ -75,7 +79,7 @@ def stop_logging(runtime: LoggingRuntime) -> None:
     runtime.manager.shutdown()
 
 
-def configure_main_logging(queue: Any) -> None:
+def _configure_main_logging(queue: Any) -> None:
     _configure_queue_logger(queue)
 
 
@@ -95,5 +99,7 @@ def get_logger() -> logging.Logger:
     return logging.getLogger("email_analyzer")
 
 
-def log_event(logger: logging.Logger, message: str, level: int = logging.INFO, **event: Any) -> None:
+def log_event(
+    logger: logging.Logger, message: str, level: int = logging.INFO, **event: Any
+) -> None:
     logger.log(level, message, extra={"event": event})

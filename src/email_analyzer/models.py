@@ -17,9 +17,7 @@ class PartAnalysis:
     charset: str | None
     classification: str
     is_multipart: bool
-    decoded_bytes: bytes | None = field(default=None, repr=False)
     decoded_byte_size: int = 0
-    decoded_text: str | None = field(default=None, repr=False)
     visible_text: str | None = field(default=None, repr=False)
     normalized_text: str | None = field(default=None, repr=False)
     charset_used: str | None = None
