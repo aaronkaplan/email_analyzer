@@ -180,7 +180,7 @@ def test_render_batch_marks_defaulted_schema_fields_as_required(tmp_path: Path) 
         processed_dir=processed_dir,
         batch_dir=batch_dir,
         model="gpt-4o-mini",
-        schema_file=Path("/Users/aaron/Desktop/git/work/ec/email_analyzer/docs/structured_output_schema_example.py"),
+        schema_file=Path("./docs/structured_output_schema_example.py"),
     )
 
     exit_code = run_render_batch(config)
