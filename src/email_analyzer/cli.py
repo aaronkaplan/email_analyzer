@@ -8,10 +8,12 @@ from dotenv import find_dotenv, load_dotenv
 
 from .batch_output_xlsx import run_batch_output_to_xlsx
 from .batch_submitter import run_batch_submitter
+from .eval_benchmark import run_eval_benchmark
 from .config import (
     BatchOutputXlsxConfig,
     BatchSubmitConfig,
     DEFAULT_OLLAMA_NUM_PARALLEL_JOBS,
+    EvalBenchmarkConfig,
     FlattenMailboxConfig,
     OllamaBatchSubmitConfig,
     PrepareConfig,
@@ -141,6 +143,35 @@ def build_parser() -> argparse.ArgumentParser:
     export_parser.add_argument("--output-xlsx", dest="output_xlsx", type=Path)
     export_parser.add_argument("--schema-file", dest="schema_file", type=Path)
 
+    eval_parser = subparsers.add_parser(
+        "eval-benchmark",
+        help="Evaluate batch output against ground-truth labels",
+    )
+    eval_parser.add_argument(
+        "--batch-output-jsonl",
+        dest="batch_output_jsonl",
+        required=True,
+        type=Path,
+    )
+    eval_parser.add_argument("--output-xlsx", dest="output_xlsx", type=Path)
+    eval_parser.add_argument(
+        "--label-field",
+        dest="label_field",
+        default="classification",
+        help="JSON field name in the model output containing the predicted label",
+    )
+    eval_parser.add_argument(
+        "--positive-class",
+        dest="positive_class",
+        help="Positive class label for binary F1 reporting",
+    )
+    eval_parser.add_argument(
+        "--category-map",
+        dest="category_map_file",
+        type=Path,
+        help="JSON file mapping filename prefixes to canonical label values",
+    )
+
     return parser
 
 
@@ -214,6 +245,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             schema_file=args.schema_file,
         )
         return run_batch_output_to_xlsx(config)
+
+    if args.command == "eval-benchmark":
+        config = EvalBenchmarkConfig(
+            batch_output_jsonl=args.batch_output_jsonl,
+            output_xlsx=args.output_xlsx,
+            label_field=args.label_field,
+            positive_class=args.positive_class,
+            category_map_file=args.category_map_file,
+        )
+        return run_eval_benchmark(config)
 
     parser.error(f"Unknown command: {args.command}")
     return 2

@@ -356,6 +356,17 @@ Prefer fixture-driven tests with small real-world `.eml` samples.
 5. do not silently drop content without a logged reason
 6. do not assume HTML and plain text parts are both worth sending to the LLM
 
+## Regression Checking Strategy
+
+Before every major release or git tag, re-run the benchmark suite to check for regressions:
+
+1. **Spam detection benchmark**: run the stratified ~500-email SpamAssassin sample through the full pipeline (`prepare` → `render-batch` → `submit-ollama-batch` → `eval-benchmark`) and compare precision/recall/F1 against the last tagged baseline.
+2. **Phishing detection benchmark**: run the Nazario phishing corpus + SpamAssassin easy\_ham legitimates through the same pipeline and compare metrics.
+3. **Performance regression**: compare wall-clock time and per-request `total_duration` against the baseline run on the same hardware (3× RTX 4090, `nanu`).
+4. **Ask the user** before proceeding with the tag/release if any metric has regressed beyond a reasonable threshold.
+
+The benchmark datasets, prompts, and schemas live under `benchmarks/`. The `eval-benchmark` subcommand produces the confusion matrix, per-class precision/recall/F1, and an XLSX report for each run. Store baseline results alongside the benchmark runs so future comparisons are straightforward.
+
 ## Decision Summary
 
 When in doubt, keep these decisions fixed:

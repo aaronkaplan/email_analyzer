@@ -112,3 +112,12 @@ class BatchOutputXlsxConfig:
     input_jsonl: Path
     output_xlsx: Path
     schema_file: Path | None = None
+
+
+@dataclass(slots=True)
+class EvalBenchmarkConfig:
+    batch_output_jsonl: Path
+    output_xlsx: Path | None = None
+    label_field: str = "classification"
+    positive_class: str | None = None
+    category_map_file: Path | None = None
