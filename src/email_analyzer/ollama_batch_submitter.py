@@ -3,10 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import ssl
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 from urllib import error as urllib_error
@@ -161,7 +163,15 @@ def run_ollama_batch_submitter(
             num_parallel_jobs=config.num_parallel_jobs,
         )
         reporter_obj = reporter or RichBatchStatusReporter(console_obj)
-        executor_fn = request_executor or _execute_ollama_chat_request
+        if request_executor is not None:
+            executor_fn = request_executor
+        elif config.insecure:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            executor_fn = partial(_execute_ollama_chat_request, ssl_context=ctx)
+        else:
+            executor_fn = _execute_ollama_chat_request
         total_requests = len(prepared_requests)
         progress_event_count = 0
 
@@ -617,6 +627,7 @@ def _execute_ollama_chat_request(
     base_url: str,
     payload: dict[str, Any],
     request_timeout_seconds: int,
+    ssl_context: ssl.SSLContext | None = None,
 ) -> dict[str, Any]:
     target_url = urllib_parse.urljoin(base_url + "/", OLLAMA_CHAT_ENDPOINT.lstrip("/"))
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -628,7 +639,9 @@ def _execute_ollama_chat_request(
     )
 
     try:
-        with urllib_request.urlopen(req, timeout=request_timeout_seconds) as response:
+        with urllib_request.urlopen(
+            req, timeout=request_timeout_seconds, context=ssl_context
+        ) as response:
             raw_body = response.read().decode("utf-8")
             status_code = response.getcode()
     except urllib_error.HTTPError as exc:

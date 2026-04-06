@@ -105,6 +105,7 @@ class OllamaBatchSubmitConfig:
     num_shards: int | None = None
     num_parallel_jobs: int = DEFAULT_OLLAMA_NUM_PARALLEL_JOBS
     request_timeout_seconds: int = DEFAULT_OLLAMA_REQUEST_TIMEOUT_SECONDS
+    insecure: bool = False
 
 
 @dataclass(slots=True)

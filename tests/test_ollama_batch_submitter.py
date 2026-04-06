@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import json
+import ssl
 import threading
 import time
 from io import StringIO
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from rich.console import Console
 
 from email_analyzer.config import OllamaBatchSubmitConfig
 from email_analyzer.ollama_batch_submitter import (
+    _execute_ollama_chat_request,
     _resolve_output_dir,
     _translate_request,
     run_ollama_batch_submitter,
@@ -789,3 +792,151 @@ def test_run_ollama_batch_submitter_sharded_mode_reports_aggregate_progress(
         event[0] == "update" and event[1] == "in_progress" and event[3] > 0
         for event in reporter.events
     )
+
+
+def test_insecure_config_defaults_to_false() -> None:
+    config = OllamaBatchSubmitConfig(batch_jsonl=Path("dummy.jsonl"))
+    assert config.insecure is False
+
+
+def test_insecure_flag_creates_unverified_ssl_context(
+    tmp_path: Path,
+) -> None:
+    """When insecure=True and no custom executor, the default executor should
+    be a partial with an unverified SSLContext bound."""
+    batch_jsonl = tmp_path / "output" / "batches" / "batch-00001.jsonl"
+    batch_jsonl.parent.mkdir(parents=True)
+    batch_jsonl.write_text(
+        json.dumps(
+            {
+                "custom_id": "a.eml",
+                "method": "POST",
+                "url": "/v1/responses",
+                "body": {
+                    "model": "test-model",
+                    "instructions": "Say hi.",
+                    "input": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": '{"email_id":"a.eml"}'}
+                            ],
+                        }
+                    ],
+                    "text": {
+                        "format": {
+                            "type": "json_schema",
+                            "name": "s",
+                            "schema": {
+                                "type": "object",
+                                "properties": {"out": {"type": "string"}},
+                                "required": ["out"],
+                            },
+                            "strict": True,
+                        }
+                    },
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    captured_contexts: list[ssl.SSLContext | None] = []
+
+    def spy_executor(
+        base_url: str,
+        payload: dict[str, object],
+        request_timeout_seconds: int,
+        ssl_context: ssl.SSLContext | None = None,
+    ) -> dict[str, object]:
+        captured_contexts.append(ssl_context)
+        return {
+            "model": "test-model",
+            "created_at": "2026-04-06T00:00:00Z",
+            "message": {
+                "role": "assistant",
+                "content": json.dumps({"out": "hello"}),
+            },
+            "done": True,
+            "done_reason": "stop",
+            "prompt_eval_count": 1,
+            "eval_count": 1,
+        }
+
+    with patch(
+        "email_analyzer.ollama_batch_submitter._execute_ollama_chat_request",
+        spy_executor,
+    ):
+        exit_code = run_ollama_batch_submitter(
+            OllamaBatchSubmitConfig(
+                batch_jsonl=batch_jsonl,
+                base_urls=("https://localhost:11434",),
+                model="test-model",
+                insecure=True,
+            ),
+            reporter=RecordingReporter(),
+            console=Console(file=StringIO(), force_terminal=False, color_system=None),
+        )
+
+    assert exit_code == 0
+    assert len(captured_contexts) == 1
+    ctx = captured_contexts[0]
+    assert isinstance(ctx, ssl.SSLContext)
+    assert ctx.check_hostname is False
+    assert ctx.verify_mode == ssl.CERT_NONE
+
+
+def test_execute_ollama_chat_request_passes_ssl_context_to_urlopen() -> None:
+    """Verify that _execute_ollama_chat_request forwards the ssl_context
+    parameter to urllib.request.urlopen."""
+    mock_response = MagicMock()
+    mock_response.read.return_value = b'{"model":"m","done":true}'
+    mock_response.getcode.return_value = 200
+    mock_response.__enter__ = MagicMock(return_value=mock_response)
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    with patch(
+        "email_analyzer.ollama_batch_submitter.urllib_request.urlopen",
+        return_value=mock_response,
+    ) as mock_urlopen:
+        result = _execute_ollama_chat_request(
+            "https://localhost:11434",
+            {"model": "m", "messages": []},
+            60,
+            ssl_context=ctx,
+        )
+
+    assert result == {"model": "m", "done": True}
+    mock_urlopen.assert_called_once()
+    call_kwargs = mock_urlopen.call_args
+    assert call_kwargs.kwargs.get("context") is ctx
+
+
+def test_secure_by_default_does_not_pass_ssl_context() -> None:
+    """Without insecure=True, no custom SSLContext should be passed."""
+    mock_response = MagicMock()
+    mock_response.read.return_value = b'{"ok":true}'
+    mock_response.getcode.return_value = 200
+    mock_response.__enter__ = MagicMock(return_value=mock_response)
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch(
+        "email_analyzer.ollama_batch_submitter.urllib_request.urlopen",
+        return_value=mock_response,
+    ) as mock_urlopen:
+        _execute_ollama_chat_request(
+            "https://localhost:11434",
+            {"model": "m", "messages": []},
+            60,
+        )
+
+    mock_urlopen.assert_called_once()
+    call_kwargs = mock_urlopen.call_args
+    # When ssl_context is None, context=None is passed to urlopen,
+    # which means urllib uses the default (verified) SSL behaviour.
+    assert call_kwargs.kwargs.get("context") is None

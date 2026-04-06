@@ -133,6 +133,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=600,
     )
+    ollama_submit_parser.add_argument(
+        "-k",
+        "--insecure",
+        dest="insecure",
+        action="store_true",
+        default=False,
+        help="Disable TLS certificate verification (like curl -k)",
+    )
 
     export_parser = subparsers.add_parser(
         "batch-output-to-xlsx", help="Convert OpenAI batch output JSONL into XLSX"
@@ -235,6 +243,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             num_shards=args.num_shards,
             num_parallel_jobs=max(1, args.num_parallel_jobs),
             request_timeout_seconds=max(1, args.request_timeout_seconds),
+            insecure=args.insecure,
         )
         return run_ollama_batch_submitter(config)
 
