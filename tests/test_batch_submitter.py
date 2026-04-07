@@ -492,6 +492,8 @@ def test_format_status_line_includes_progress_fields() -> None:
             percent_complete=75.0,
             elapsed_seconds=90.0,
             state_elapsed_seconds=12.0,
+            speed_emails_per_sec=15.0 / 90.0,
+            eta_seconds=5.0 / (15.0 / 90.0),
         )
     )
 
@@ -500,3 +502,5 @@ def test_format_status_line_includes_progress_fields() -> None:
     assert "15/20" in line
     assert "75.0%" in line
     assert "failed 3" in line
+    assert "6.00s/it" in line
+    assert "ETA 00:00:30" in line

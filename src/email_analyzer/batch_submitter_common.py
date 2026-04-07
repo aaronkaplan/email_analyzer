@@ -39,6 +39,8 @@ class BatchDisplaySnapshot:
     percent_complete: float
     elapsed_seconds: float
     state_elapsed_seconds: float
+    speed_emails_per_sec: float | None
+    eta_seconds: float | None
 
 
 class StatusReporter(Protocol):
@@ -72,6 +74,8 @@ class RichBatchStatusReporter:
             ),
             TimeElapsedColumn(),
             TextColumn("state={task.fields[state_elapsed]}"),
+            TextColumn("{task.fields[speed]}"),
+            TextColumn("{task.fields[eta]}"),
             console=self.console,
             transient=True,
         )
@@ -189,6 +193,9 @@ def build_display_snapshot(
     percent_complete = (
         0.0 if total_requests == 0 else (processed / total_requests) * 100.0
     )
+    elapsed = max(0.0, now_monotonic - started_monotonic)
+    speed = processed / elapsed if elapsed > 0 and processed > 0 else None
+    eta = remaining / speed if speed and speed > 0 and remaining > 0 else None
     return BatchDisplaySnapshot(
         batch_id=str(batch.get("id", "unknown")),
         status=str(batch.get("status", "unknown")),
@@ -198,8 +205,10 @@ def build_display_snapshot(
         processed_requests=processed,
         remaining_requests=remaining,
         percent_complete=percent_complete,
-        elapsed_seconds=max(0.0, now_monotonic - started_monotonic),
+        elapsed_seconds=elapsed,
         state_elapsed_seconds=max(0.0, now_monotonic - state_started_monotonic),
+        speed_emails_per_sec=speed,
+        eta_seconds=eta,
     )
 
 
@@ -449,13 +458,29 @@ def format_duration(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
+def format_speed(speed: float | None) -> str:
+    if speed is None or speed <= 0:
+        return "?it/s"
+    if speed >= 1.0:
+        return f"{speed:.2f}it/s"
+    return f"{1.0 / speed:.2f}s/it"
+
+
+def format_eta(eta_seconds: float | None) -> str:
+    if eta_seconds is None:
+        return "ETA --:--:--"
+    return f"ETA {format_duration(eta_seconds)}"
+
+
 def format_status_line(snapshot: BatchDisplaySnapshot) -> str:
     return (
         f"[{format_duration(snapshot.elapsed_seconds)}] {snapshot.status:<11} {snapshot.batch_id[-8:]} "
         f"processed {snapshot.processed_requests}/{snapshot.total_requests} "
         f"{snapshot.percent_complete:5.1f}% ok {snapshot.completed_requests} "
         f"failed {snapshot.failed_requests} remaining {snapshot.remaining_requests} "
-        f"state_elapsed {format_duration(snapshot.state_elapsed_seconds)}"
+        f"state_elapsed {format_duration(snapshot.state_elapsed_seconds)} "
+        f"{format_speed(snapshot.speed_emails_per_sec)} "
+        f"{format_eta(snapshot.eta_seconds)}"
     )
 
 
@@ -469,4 +494,6 @@ def _progress_fields(snapshot: BatchDisplaySnapshot) -> dict[str, int | str]:
         "failed": snapshot.failed_requests,
         "remaining": snapshot.remaining_requests,
         "state_elapsed": format_duration(snapshot.state_elapsed_seconds),
+        "speed": format_speed(snapshot.speed_emails_per_sec),
+        "eta": format_eta(snapshot.eta_seconds),
     }
