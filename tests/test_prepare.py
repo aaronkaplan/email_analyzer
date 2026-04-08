@@ -34,24 +34,48 @@ def test_prepare_outputs_reduced_json_and_logs(tmp_path: Path) -> None:
     processed = json.loads(processed_path.read_text(encoding="utf-8"))
     assert processed["email_id"] == fixture_path.name
     assert processed["source_filename"] == fixture_path.name
-    assert processed["canonical_body"]["text"] == "Hello Bob,\n\nHere is the update you asked for.\n\nRegards,\nAlice"
-    assert any(item["reason"] == "duplicate_body_representation" for item in processed["dropped_parts"])
+    assert (
+        processed["canonical_body"]["text"]
+        == "Hello Bob,\n\nHere is the update you asked for.\n\nRegards,\nAlice"
+    )
+    assert any(
+        item["reason"] == "duplicate_body_representation"
+        for item in processed["dropped_parts"]
+    )
     assert any(item["filename"] == "body.html" for item in processed["dropped_parts"])
 
-    kept_attachment_names = [item["filename"] for item in processed["attachments"] if item["kept"]]
+    kept_attachment_names = [
+        item["filename"] for item in processed["attachments"] if item["kept"]
+    ]
     assert kept_attachment_names == ["notes.txt"]
 
-    kept_snippet_names = [item["filename"] for item in processed["kept_snippets"] if item["kind"] == "attachment"]
+    kept_snippet_names = [
+        item["filename"]
+        for item in processed["kept_snippets"]
+        if item["kind"] == "attachment"
+    ]
     assert kept_snippet_names == ["notes.txt"]
 
-    assert "write_output" in processed["timings_ms"]
-    assert processed["total_duration_ms"] >= processed["timings_ms"]["write_output"]
+    # write_output timing is recorded in logs but not in the artifact
+    # (artifact is written once with pre-write timings to avoid double-write)
+    assert "write_output" not in processed["timings_ms"]
+    assert processed["total_duration_ms"] > 0
 
     pipeline_log = logs_dir / "pipeline.jsonl"
     assert pipeline_log.exists()
-    log_entries = [json.loads(line) for line in pipeline_log.read_text(encoding="utf-8").splitlines()]
-    assert any(entry.get("step") == "filter_duplicate_body_representations" for entry in log_entries)
-    assert any(entry.get("reason") == "duplicate_body_representation" for entry in log_entries)
+    log_entries = [
+        json.loads(line)
+        for line in pipeline_log.read_text(encoding="utf-8").splitlines()
+    ]
+    assert any(
+        entry.get("step") == "filter_duplicate_body_representations"
+        for entry in log_entries
+    )
+    assert any(
+        entry.get("reason") == "duplicate_body_representation" for entry in log_entries
+    )
 
-    step_summary = json.loads((logs_dir / "step_summary.json").read_text(encoding="utf-8"))
+    step_summary = json.loads(
+        (logs_dir / "step_summary.json").read_text(encoding="utf-8")
+    )
     assert "parse_source" in step_summary

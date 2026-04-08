@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from email import policy
 from email.message import EmailMessage, Message
 from email.parser import BytesParser
@@ -12,6 +13,8 @@ from charset_normalizer import from_bytes
 from .config import DEFAULT_TEXT_ATTACHMENT_EXTENSIONS, SELECTED_HEADER_NAMES
 from .html import html_to_text, normalize_for_dedupe, normalize_visible_text
 from .models import PartAnalysis
+
+logger = logging.getLogger(__name__)
 
 
 def parse_email_bytes(raw_bytes: bytes) -> EmailMessage:
@@ -140,7 +143,18 @@ def _decode_part(part: PartAnalysis) -> None:
     if payload is None:
         raw_payload = part.message_part.get_payload()
         if isinstance(raw_payload, str):
-            payload = raw_payload.encode(part.charset or "utf-8", errors="ignore")
+            charset = part.charset or "utf-8"
+            payload = raw_payload.encode(charset, errors="ignore")
+            logger.debug(
+                "Encoding fallback: re-encoded str payload with charset=%s "
+                "errors='ignore' for part %s (%s), original length=%d, "
+                "encoded length=%d",
+                charset,
+                part.mime_path,
+                part.content_type,
+                len(raw_payload),
+                len(payload),
+            )
         else:
             payload = b""
 

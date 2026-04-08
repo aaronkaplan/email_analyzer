@@ -3,14 +3,16 @@ name: Ruff
 on:
   pull_request:
     paths:
-      - "src/*.py"
+      - "src/**/*.py"
+      - "tests/**/*.py"
       - "Makefile"
       - ".github/workflows/ruff.yml"
   push:
     branches:
       - main
     paths:
-      - "src/*.py"
+      - "src/**/*.py"
+      - "tests/**/*.py"
       - "Makefile"
       - ".github/workflows/ruff.yml"
   workflow_dispatch:

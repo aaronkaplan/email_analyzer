@@ -347,24 +347,21 @@ def process_email_file(input_path: Path, config: PrepareConfig) -> dict[str, Any
             dropped_part_count=len(processed_email.dropped_parts),
         )
 
+        total_ms = total_duration_ms(total_start_ns)
         processed_email.timings_ms = dict(timings)
-        processed_email.total_duration_ms = 0.0
+        processed_email.total_duration_ms = total_ms
 
         write_start_ns = perf_counter_ns()
         _write_processed_email(output_path, processed_email)
-        duration_ms = round((perf_counter_ns() - write_start_ns) / 1_000_000, 3)
-        timings["write_output"] = duration_ms
-        total_ms = total_duration_ms(total_start_ns)
-        processed_email.timings_ms = timings
-        processed_email.total_duration_ms = total_ms
-        _write_processed_email(output_path, processed_email)
+        write_duration_ms = round((perf_counter_ns() - write_start_ns) / 1_000_000, 3)
+        timings["write_output"] = write_duration_ms
         log_event(
             logger,
             "Wrote processed email artifact",
             step="write_output",
             action="write_output",
             status="success",
-            duration_ms=duration_ms,
+            duration_ms=write_duration_ms,
             email_id=email_id,
             source_filename=email_id,
             output_path=str(output_path),

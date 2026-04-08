@@ -166,7 +166,8 @@ def _resolve_output_dir(config: BatchSubmitConfig) -> Path:
     if config.resume_batch_id is not None:
         return Path("batch_output") / config.resume_batch_id
 
-    assert config.batch_jsonl is not None
+    if config.batch_jsonl is None:
+        raise ValueError("batch_jsonl is required when not resuming a batch")
     if config.batch_jsonl.parent.name == "batches":
         return (
             config.batch_jsonl.parent.parent / "batch_output" / config.batch_jsonl.stem
