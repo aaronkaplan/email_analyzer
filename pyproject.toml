@@ -14,6 +14,7 @@ dependencies = [
   "mail-parser-reply>=1.36",
   "openpyxl>=3.1.5",
   "openai>=2.0.0",
+  "pydantic>=2.12.5",
   "python-dotenv>=1.1.1",
   "rapidfuzz>=3.14.3",
   "rich>=14.1.0",
